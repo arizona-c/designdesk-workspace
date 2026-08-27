@@ -44,5 +44,23 @@ figma.ui.onmessage = async (msg) => {
     await sendSettings();
   } else if (msg.type === "notify") {
     figma.notify(msg.message);
+  } else if (msg.type === "export-nodes") {
+    // 指定ノードをPNG書き出しして返す（Before/Afterキャプチャ用）。
+    // 消えたノードはスキップし、撮れたものだけ返す
+    const images = [];
+    for (const id of msg.ids) {
+      try {
+        const node = await figma.getNodeByIdAsync(id);
+        if (!node || !("exportAsync" in node)) continue;
+        const bytes = await node.exportAsync({
+          format: "PNG",
+          constraint: { type: "SCALE", value: 1 },
+        });
+        images.push({ id, name: node.name, data: figma.base64Encode(bytes) });
+      } catch (e) {
+        // 書き出せないノードは黙ってスキップ（UI側で件数を表示する）
+      }
+    }
+    figma.ui.postMessage({ type: "exported", requestId: msg.requestId, images });
   }
 };

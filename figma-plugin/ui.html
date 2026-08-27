@@ -45,10 +45,24 @@
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
 
+  const exportWaiters = {};
+  let exportSeq = 0;
+  function exportNodes(ids) {
+    return new Promise((resolve) => {
+      const requestId = ++exportSeq;
+      exportWaiters[requestId] = resolve;
+      parent.postMessage({ pluginMessage: { type: "export-nodes", ids, requestId } }, "*");
+      setTimeout(() => { if (exportWaiters[requestId]) { delete exportWaiters[requestId]; resolve([]); } }, 30000);
+    });
+  }
+
   onmessage = (e) => {
     const m = e.data.pluginMessage;
     if (!m) return;
-    if (m.type === "settings") {
+    if (m.type === "exported") {
+      const w = exportWaiters[m.requestId];
+      if (w) { delete exportWaiters[m.requestId]; w(m.images); }
+    } else if (m.type === "settings") {
       S.token = m.token; S.project = m.project; S.fileKey = m.fileKey; S.fileName = m.fileName;
       if (S.token && S.project) load(); else render();
     } else if (m.type === "selection") {
@@ -65,6 +79,18 @@
     const j = await res.json().catch(() => ({ error: "通信に失敗しました" }));
     if (!res.ok) throw new Error(j.error || "エラーが発生しました");
     return j;
+  }
+
+  async function uploadCaptures(seq, phase, ids) {
+    const images = await exportNodes(ids);
+    let ok = 0;
+    for (const img of images) {
+      try {
+        await api("POST", null, { action: "upload_capture", seq, phase, node_name: img.name, data: img.data });
+        ok++;
+      } catch (err) { /* サイズ超過等はスキップして続行 */ }
+    }
+    return ok;
   }
 
   async function load() {
@@ -159,16 +185,32 @@
     const at = document.getElementById("attach");
     if (at) at.onclick = async () => {
       try {
-        const urls = S.selection.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
+        const sel = S.selection.slice();
+        const urls = sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
         const r = await api("POST", null, { action: "attach_frames", seq: t.seq, urls });
-        S.msg = { t: "ok", text: r.message };
+        S.msg = { t: "ok", text: r.message + "（Beforeキャプチャを記録中…）" };
+        render();
+        const ok = await uploadCaptures(t.seq, "before", sel.map((n) => n.id));
+        S.msg = { t: "ok", text: r.message + (ok ? ` / Beforeキャプチャ${ok}件を記録しました` : "") };
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         await load(); S.open = t.seq;
       } catch (err) { S.msg = { t: "err", text: err.message }; }
       render();
     };
     document.getElementById("doing").onclick = () => move(t.seq, "doing");
-    document.getElementById("review").onclick = () => move(t.seq, "review");
+    document.getElementById("review").onclick = async () => {
+      // 提出の瞬間に、紐づけ済みFrameのAfterキャプチャを撮ってから移動する
+      const ids = t.frames
+        .map((u) => { const m2 = u.match(/node-id=([\d]+)-([\d]+)/); return m2 ? m2[1] + ":" + m2[2] : null; })
+        .filter(Boolean);
+      if (ids.length && S.fileKey) {
+        S.msg = { t: "ok", text: "Afterキャプチャを記録しています…" };
+        render();
+        const ok = await uploadCaptures(t.seq, "after", ids);
+        if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "Afterキャプチャ" + ok + "件を記録しました" } }, "*");
+      }
+      move(t.seq, "review");
+    };
   }
 
   async function move(seq, to) {

@@ -134,7 +134,7 @@
     if (!t) { S.open = null; render(); return; }
     const selInfo = S.selection.length
       ? "選択中: " + S.selection.map((n) => esc(n.name)).join(" / ")
-      : "Figmaで紐づけたいFrameを選択してください（複数可）";
+      : "作業対象のFrameをFigmaのキャンバスで選択してください（複数可）。チケットに紐づけておくと、レビューする人とClaudeが「どこを作業したか」を正確に特定でき、レビューと作業指示の精度が上がります。";
     const needKey = !S.fileKey;
     app.innerHTML =
       '<p><a href="#" id="back">← 一覧へ</a></p>' +
@@ -143,7 +143,7 @@
       (t.frames.length ? '<p class="mt frames">紐づけ済み:<br>' + t.frames.map(esc).join("<br>") + "</p>" : "") +
       '<p class="mt sub">' + selInfo + "</p>" +
       (needKey
-        ? '<p class="sub">このファイルのURLを一度だけ貼ってください（Frame紐づけに使います）:</p>' +
+        ? '<p class="sub">初回だけ: このファイルのURL（ブラウザのアドレス欄からコピー）を貼ってください。選択したFrameへのリンクを作るために必要です。次からは聞かれません。</p>' +
           '<input id="fileurl" placeholder="https://www.figma.com/design/…">' +
           '<p class="mt"><button id="savekey">URLを保存</button></p>'
         : '<p class="mt"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + ">選択中のFrameを紐づける</button></p>") +

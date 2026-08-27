@@ -7,7 +7,7 @@
   "editorType": ["figma"],
   "documentAccess": "dynamic-page",
   "networkAccess": {
-    "allowedDomains": ["https://arizona-designdesk.vercel.app"],
+    "allowedDomains": ["https://designdesk.arizona-c.com", "https://arizona-designdesk.vercel.app"],
     "reasoning": "Design Desk（チケットボード）との連携"
   }
 }

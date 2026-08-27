@@ -1,0 +1,183 @@
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 12px; font: 11px/1.6 -apple-system, "Hiragino Sans", sans-serif;
+    background: var(--figma-color-bg, #fff); color: var(--figma-color-text, #111);
+  }
+  h1 { font-size: 13px; margin: 0 0 4px; }
+  .sub { color: var(--figma-color-text-secondary, #777); }
+  input {
+    width: 100%; box-sizing: border-box; margin-top: 4px; padding: 6px 8px; font-size: 11px;
+    border: 1px solid var(--figma-color-border, #ccc); border-radius: 5px;
+    background: var(--figma-color-bg, #fff); color: inherit;
+  }
+  button {
+    padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 5px; cursor: pointer;
+    border: 1px solid var(--figma-color-border, #ccc); background: var(--figma-color-bg, #fff); color: inherit;
+  }
+  button.primary { background: #18a0fb; border-color: #18a0fb; color: #fff; }
+  button:disabled { opacity: .4; cursor: default; }
+  .card {
+    border: 1px solid var(--figma-color-border, #ddd); border-radius: 8px;
+    padding: 8px 10px; margin-top: 6px; cursor: pointer;
+  }
+  .card:hover { border-color: #18a0fb; }
+  .chip {
+    display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700;
+    background: var(--figma-color-bg-secondary, #f0f0f0); color: var(--figma-color-text-secondary, #777);
+  }
+  .chip.rev { background: #fff3cd; color: #8a6d1a; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .mt { margin-top: 10px; }
+  .msg { margin-top: 8px; font-size: 10px; }
+  .msg.err { color: #e03e3e; }
+  .msg.ok { color: #1a7f37; }
+  a { color: #18a0fb; text-decoration: none; }
+  .frames { font-size: 9px; color: var(--figma-color-text-secondary, #777); word-break: break-all; }
+</style>
+
+<div id="app">読み込み中…</div>
+
+<script>
+  const app = document.getElementById("app");
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, msg: null };
+  const API = "https://arizona-designdesk.vercel.app/api/plugin";
+
+  parent.postMessage({ pluginMessage: { type: "init" } }, "*");
+
+  onmessage = (e) => {
+    const m = e.data.pluginMessage;
+    if (!m) return;
+    if (m.type === "settings") {
+      S.token = m.token; S.project = m.project; S.fileKey = m.fileKey; S.fileName = m.fileName;
+      if (S.token && S.project) load(); else render();
+    } else if (m.type === "selection") {
+      S.selection = m.nodes; render();
+    }
+  };
+
+  async function api(method, params, body) {
+    const res = await fetch(API + "?project=" + encodeURIComponent(S.project), {
+      method,
+      headers: { Authorization: "Bearer " + S.token, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await res.json().catch(() => ({ error: "通信に失敗しました" }));
+    if (!res.ok) throw new Error(j.error || "エラーが発生しました");
+    return j;
+  }
+
+  async function load() {
+    try { S.data = await api("GET"); S.msg = null; }
+    catch (err) { S.data = null; S.msg = { t: "err", text: err.message }; }
+    render();
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function render() {
+    if (!S.token || !S.project) { renderSetup(); return; }
+    if (!S.data) { app.innerHTML = S.msg ? msgHtml() + retryBtn() : "読み込み中…"; bindRetry(); return; }
+    renderTickets();
+  }
+
+  function msgHtml() { return S.msg ? '<p class="msg ' + S.msg.t + '">' + esc(S.msg.text) + "</p>" : ""; }
+  function retryBtn() { return '<p class="mt"><button id="retry">再読み込み</button> <button id="logout">接続をやり直す</button></p>'; }
+  function bindRetry() {
+    const r = document.getElementById("retry"); if (r) r.onclick = load;
+    const l = document.getElementById("logout"); if (l) l.onclick = () => parent.postMessage({ pluginMessage: { type: "logout" } }, "*");
+  }
+
+  function renderSetup() {
+    app.innerHTML =
+      "<h1>Design Desk につなぐ</h1>" +
+      '<p class="sub">Design Desk のアカウントメニュー →「アクセストークン」で発行した dd_pat_… を貼り付けてください。</p>' +
+      '<input id="project" placeholder="プロジェクト名（例: daiwa）" value="' + esc(S.project || "") + '">' +
+      '<input id="token" type="password" placeholder="dd_pat_…">' +
+      '<p class="mt"><button class="primary" id="save">接続する</button></p>' + msgHtml();
+    document.getElementById("save").onclick = () => {
+      const project = document.getElementById("project").value.trim();
+      const token = document.getElementById("token").value.trim();
+      if (!project || !token) return;
+      parent.postMessage({ pluginMessage: { type: "save-settings", token, project } }, "*");
+    };
+  }
+
+  function ticketCard(t) {
+    return (
+      '<div class="card" data-seq="' + t.seq + '">' +
+      '<div class="row"><span class="chip' + (t.role === "レビュー" ? " rev" : "") + '">' + esc(t.role) + "</span>" +
+      '<span class="chip">' + esc(t.column) + "</span>" +
+      (t.due ? '<span class="sub">期日 ' + esc(t.due.slice(5)) + "</span>" : "") + "</div>" +
+      '<div style="margin-top:2px"><b>#' + t.seq + "</b> " + esc(t.title) + "</div>" +
+      (t.frames.length ? '<div class="frames">🔗 Frame×' + t.frames.length + "</div>" : "") +
+      "</div>"
+    );
+  }
+
+  function renderTickets() {
+    const d = S.data;
+    if (S.open != null) { renderDetail(); return; }
+    app.innerHTML =
+      "<h1>" + esc(d.project.name) + " — 自分のチケット</h1>" +
+      '<p class="sub">' + esc(d.user.name) + " さん / チケットを選ぶと、選択中のFrameを紐づけられます</p>" +
+      (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<p class="mt sub">進行中の担当チケットはありません</p>') +
+      msgHtml() +
+      '<p class="mt"><button id="reload">更新</button> <button id="logout">接続をやり直す</button></p>';
+    app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { S.open = Number(c.dataset.seq); S.msg = null; render(); }));
+    document.getElementById("reload").onclick = load;
+    document.getElementById("logout").onclick = () => { S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };
+  }
+
+  function renderDetail() {
+    const t = S.data.tickets.find((x) => x.seq === S.open);
+    if (!t) { S.open = null; render(); return; }
+    const selInfo = S.selection.length
+      ? "選択中: " + S.selection.map((n) => esc(n.name)).join(" / ")
+      : "Figmaで紐づけたいFrameを選択してください（複数可）";
+    const needKey = !S.fileKey;
+    app.innerHTML =
+      '<p><a href="#" id="back">← 一覧へ</a></p>' +
+      "<h1>#" + t.seq + " " + esc(t.title) + "</h1>" +
+      '<div class="row"><span class="chip">' + esc(t.column) + '</span><span class="chip' + (t.role === "レビュー" ? " rev" : "") + '">' + esc(t.role) + "</span></div>" +
+      (t.frames.length ? '<p class="mt frames">紐づけ済み:<br>' + t.frames.map(esc).join("<br>") + "</p>" : "") +
+      '<p class="mt sub">' + selInfo + "</p>" +
+      (needKey
+        ? '<p class="sub">このファイルのURLを一度だけ貼ってください（Frame紐づけに使います）:</p>' +
+          '<input id="fileurl" placeholder="https://www.figma.com/design/…">' +
+          '<p class="mt"><button id="savekey">URLを保存</button></p>'
+        : '<p class="mt"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + ">選択中のFrameを紐づける</button></p>") +
+      '<p class="mt row"><button id="doing">作業中へ</button><button id="review">レビューへ提出</button></p>' +
+      msgHtml();
+    document.getElementById("back").onclick = (e) => { e.preventDefault(); S.open = null; render(); };
+    const sk = document.getElementById("savekey");
+    if (sk) sk.onclick = () => {
+      const m2 = (document.getElementById("fileurl").value || "").match(/figma\.com\/(?:design|file)\/([A-Za-z0-9]+)/);
+      if (m2) parent.postMessage({ pluginMessage: { type: "save-filekey", fileKey: m2[1] } }, "*");
+      else { S.msg = { t: "err", text: "URLからファイルIDを読み取れませんでした" }; render(); }
+    };
+    const at = document.getElementById("attach");
+    if (at) at.onclick = async () => {
+      try {
+        const urls = S.selection.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
+        const r = await api("POST", null, { action: "attach_frames", seq: t.seq, urls });
+        S.msg = { t: "ok", text: r.message };
+        parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        await load(); S.open = t.seq;
+      } catch (err) { S.msg = { t: "err", text: err.message }; }
+      render();
+    };
+    document.getElementById("doing").onclick = () => move(t.seq, "doing");
+    document.getElementById("review").onclick = () => move(t.seq, "review");
+  }
+
+  async function move(seq, to) {
+    try {
+      const r = await api("POST", null, { action: "move", seq, to });
+      S.msg = { t: "ok", text: r.message };
+      parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+      await load(); S.open = seq;
+    } catch (err) { S.msg = { t: "err", text: err.message }; }
+    render();
+  }
+</script>

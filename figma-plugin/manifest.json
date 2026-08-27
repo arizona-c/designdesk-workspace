@@ -1,0 +1,13 @@
+{
+  "name": "Design Desk",
+  "id": "designdesk-dev-plugin",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["https://arizona-designdesk.vercel.app"],
+    "reasoning": "Design Desk（チケットボード）との連携"
+  }
+}

@@ -17,4 +17,22 @@ else
   rm -f .claude/designdesk-rules.md.tmp
   echo "⚠ Design Desk 同期に失敗（オフライン/トークン無効?）。前回のルールのまま続行します"
 fi
+
+# Design Desk のチケット操作ツール（MCP）の接続設定を生成する。
+# トークンを含むためコミットされない（.gitignore済み）。初回生成時は次回の起動から有効
+FIRST_MCP=0; [ -f .mcp.json ] || FIRST_MCP=1
+cat > .mcp.json <<MCPEOF
+{
+  "mcpServers": {
+    "designdesk": {
+      "type": "http",
+      "url": "$DESIGNDESK_URL/api/mcp?project=$DESIGNDESK_PROJECT",
+      "headers": { "Authorization": "Bearer $DESIGNDESK_TOKEN" }
+    }
+  }
+}
+MCPEOF
+if [ "$FIRST_MCP" = "1" ]; then
+  echo "🔌 Design Desk のチケット操作（MCP）を設定しました。次回の起動から使えます"
+fi
 exit 0

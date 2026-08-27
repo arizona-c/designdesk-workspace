@@ -3,9 +3,13 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "bash sync.sh" }
+          {
+            "type": "command",
+            "command": "bash sync.sh"
+          }
         ]
       }
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true
 }

@@ -9,6 +9,14 @@ Arizona Creative の **UIデザイナーが、担当案件のデザイン作業�
 - 担当案件: `.env` の `DESIGNDESK_PROJECT`
 - チームの正本: Design Desk（`.env` の `DESIGNDESK_URL`）
 
+## 案件ルール（Design Desk から自動同期）
+
+最新の案件ルールは起動時に `.claude/designdesk-rules.md` へ自動同期され、下の行で取り込まれる。
+**そこに書かれたルール（特にCRITICAL）は本ファイルや個人メモより優先**。
+ファイルが無い/同期時刻が古い場合は `bash sync.sh` を実行する。
+
+@.claude/designdesk-rules.md
+
 ## ふるまい（最重要）
 
 - 日本語で応答する。タイムゾーンは Asia/Tokyo
@@ -48,8 +56,8 @@ Design Desk とのMCP接続は**まだ提供されていない**ので、促さ�
 
 ## 準備中（もうすぐ手伝えるようになること）
 
-- 🚧 **Design Desk 連携**: 案件ルール・スキルの自動取得、チケット操作（作業中へ移動・report添付）。
-  有効化までは Design Desk の画面で確認・操作するよう案内する
+- ✅ **案件ルールの自動同期**: 起動時に最新ルールを取得済み（.claude/designdesk-rules.md）
+- 🚧 **チケット操作（MCP）**: 作業中へ移動・report添付などは準備中。Design Desk の画面で操作するよう案内する
 - 🚧 **Figma 操作**: MCP接続が配布されたら、Figmaファイルの読み取り・操作を直接手伝える。
   初回に /mcp での認証が必要 — 聞かれたら1手順ずつ伴走する
 

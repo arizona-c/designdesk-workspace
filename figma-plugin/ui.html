@@ -92,7 +92,7 @@
     app.innerHTML =
       "<h1>Design Desk につなぐ</h1>" +
       '<p class="sub">Design Desk のアカウントメニュー →「アクセストークン」で発行した dd_pat_… を貼り付けてください。</p>' +
-      '<input id="project" placeholder="プロジェクト名（例: daiwa）" value="' + esc(S.project || "") + '">' +
+      '<input id="project" placeholder="プロジェクトID（ディレクターから聞いた名前。例: app-dev）" value="' + esc(S.project || "") + '">' +
       '<input id="token" type="password" placeholder="dd_pat_…">' +
       '<p class="mt"><button class="primary" id="save">接続する</button></p>' + msgHtml();
     document.getElementById("save").onclick = () => {

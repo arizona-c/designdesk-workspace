@@ -9,7 +9,8 @@ Figmaの中から、自分のチケットの確認・選択中Frameの紐づけ�
 2. メニュー → Plugins → Development → **Import plugin from manifest…**
 3. このフォルダの `manifest.json` を選択
 4. Plugins → Development → **Design Desk** で起動
-5. 初回はプロジェクト名（例: daiwa）と個人アクセストークン（Design Deskのアカウントメニュー→アクセストークンで発行）を入力
+5. 初回はプロジェクトID（例: app-dev）と、プラグイン用に発行した個人アクセストークンを入力
+   （アカウントメニュー→アクセストークンで「Figmaプラグイン」の名前で発行。既存トークンは無効にならない）
 
 ## できること
 

@@ -146,12 +146,13 @@
   function renderTickets() {
     const d = S.data;
     if (S.open != null) { renderDetail(); return; }
+    const faqUrl = "https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/faq#" + encodeURIComponent("Figmaプラグイン");
     app.innerHTML =
       "<h1>" + esc(d.project.name) + " — 自分のチケット</h1>" +
-      '<p class="sub">' + esc(d.user.name) + " さん / チケットを選ぶと、選択中のFrameを紐づけられます</p>" +
+      '<p class="sub">' + esc(d.user.name) + ' さん｜ログイン中 / <a href="' + faqUrl + '" target="_blank">詳しい使い方はこちら</a></p>' +
+      '<p class="row" style="margin-top:6px"><button id="reload">更新</button> <button id="logout">接続をやり直す</button></p>' +
       (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<p class="mt sub">進行中の担当チケットはありません</p>') +
-      msgHtml() +
-      '<p class="mt"><button id="reload">更新</button> <button id="logout">接続をやり直す</button></p>';
+      msgHtml();
     app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { S.open = Number(c.dataset.seq); S.msg = null; render(); }));
     document.getElementById("reload").onclick = load;
     document.getElementById("logout").onclick = () => { S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };

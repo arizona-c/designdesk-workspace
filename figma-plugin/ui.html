@@ -40,7 +40,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, msg: null };
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null };
   const API = "https://designdesk.arizona-c.com/api/plugin";
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
@@ -199,14 +199,40 @@
   function renderDetail() {
     const t = S.data.tickets.find((x) => x.seq === S.open);
     if (!t) { S.open = null; render(); return; }
+    if (S.editing) {
+      app.innerHTML =
+        '<p><a href="#" id="back">← 詳細へ戻る</a></p>' +
+        "<h1>#" + t.seq + " を編集</h1>" +
+        '<input id="ed-title" value="' + esc(t.title) + '">' +
+        '<textarea id="ed-desc" placeholder="説明" style="width:100%;box-sizing:border-box;margin-top:6px;min-height:96px;padding:6px 8px;font:inherit;border:1px solid var(--figma-color-border,#ccc);border-radius:5px;background:var(--figma-color-bg,#fff);color:inherit">' + esc(t.description || "") + "</textarea>" +
+        '<p class="mt row"><button class="primary" id="ed-save">保存</button><button id="ed-cancel">やめる</button></p>' +
+        '<p class="sub">変更は履歴に残り、Webのチケット詳細からいつでも巻き戻せます</p>' +
+        msgHtml();
+      document.getElementById("back").onclick = (e) => { e.preventDefault(); S.editing = false; render(); };
+      document.getElementById("ed-cancel").onclick = () => { S.editing = false; render(); };
+      document.getElementById("ed-save").onclick = async () => {
+        const title = document.getElementById("ed-title").value.trim();
+        const description = document.getElementById("ed-desc").value;
+        if (!title) { S.msg = { t: "err", text: "タイトルは空にできません" }; render(); return; }
+        try {
+          const r = await api("POST", null, { action: "update", seq: t.seq, title, description });
+          parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+          await load(); S.editing = false; S.open = t.seq; S.msg = { t: "ok", text: r.message };
+        } catch (err) { S.msg = { t: "err", text: err.message }; }
+        render();
+      };
+      return;
+    }
     const selInfo = S.selection.length
       ? "選択中: " + S.selection.map((n) => esc(n.name)).join(" / ")
       : "作業対象のFrameをFigmaのキャンバスで選択してください（複数可）。チケットに紐づけておくと、レビューする人とClaudeが「どこを作業したか」を正確に特定でき、レビューと作業指示の精度が上がります。";
     const needKey = !S.fileKey;
     app.innerHTML =
       '<p><a href="#" id="back">← 一覧へ</a></p>' +
-      "<h1>#" + t.seq + " " + esc(t.title) + "</h1>" +
+      "<h1>#" + t.seq + " " + esc(t.title) + ' <a href="#" id="edit" title="タイトル・説明を編集" style="font-size:11px;font-weight:400">✏️ 編集</a></h1>' +
       '<div class="row"><span class="chip">' + esc(t.column) + '</span><span class="chip' + (t.role === "レビュー" ? " rev" : "") + '">' + esc(t.role) + "</span></div>" +
+      (t.description ? '<p class="sub" style="white-space:pre-wrap;margin-top:6px">' + esc(t.description) + "</p>" : "") +
+      '<p class="mt row"><input id="addurl" placeholder="FigmaのURLを貼って紐づけ（コピペ用）" style="flex:1;min-width:120px;margin-top:0"><button id="addurlgo">追加</button></p>' +
       (t.frames.length
         ? '<p class="mt frames">紐づけ済み（クリックで移動）:<br>' +
           t.frames.map((u, i) => '<a href="#" class="frame-link" data-url="' + esc(u) + '">🔗 Frame ' + (i + 1) + "</a>").join("<br>") +
@@ -228,6 +254,19 @@
       "</select></p>" +
       msgHtml();
     document.getElementById("back").onclick = (e) => { e.preventDefault(); S.open = null; render(); };
+    const ed = document.getElementById("edit");
+    if (ed) ed.onclick = (e) => { e.preventDefault(); S.editing = true; S.msg = null; render(); };
+    const aug = document.getElementById("addurlgo");
+    if (aug) aug.onclick = async () => {
+      const url = (document.getElementById("addurl").value || "").trim();
+      if (!/figma\.com\//.test(url)) { S.msg = { t: "err", text: "FigmaのURLを貼ってください" }; render(); return; }
+      try {
+        const r = await api("POST", null, { action: "attach_frames", seq: t.seq, urls: [url] });
+        parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        await load(); S.open = t.seq; S.msg = { t: "ok", text: r.message };
+      } catch (err) { S.msg = { t: "err", text: err.message }; }
+      render();
+    };
     app.querySelectorAll(".frame-link").forEach((a) => {
       a.onclick = (e) => {
         e.preventDefault();

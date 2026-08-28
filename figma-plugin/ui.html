@@ -62,6 +62,17 @@
     if (m.type === "exported") {
       const w = exportWaiters[m.requestId];
       if (w) { delete exportWaiters[m.requestId]; w(m.images); }
+    } else if (m.type === "design-system") {
+      if (!m.ok) { S.msg = { t: "err", text: "読み取りに失敗: " + m.error }; render(); return; }
+      (async () => {
+        try {
+          S.msg = { t: "ok", text: "Design Deskへ送信中…" }; render();
+          const r = await api("POST", null, { action: "sync_design_system", collections: m.collections, textStyles: m.textStyles });
+          S.msg = { t: "ok", text: r.message };
+          parent.postMessage({ pluginMessage: { type: "notify", message: "デザインシステムを同期しました" } }, "*");
+        } catch (err) { S.msg = { t: "err", text: err.message }; }
+        render();
+      })();
     } else if (m.type === "goto-result") {
       if (!m.ok && m.url) window.open(m.url, "_blank");
     } else if (m.type === "settings") {
@@ -155,11 +166,18 @@
     app.innerHTML =
       "<h1>" + esc(d.project.name) + " — 自分のチケット</h1>" +
       '<p class="sub">' + esc(d.user.name) + ' さん｜ログイン中 / <a href="' + faqUrl + '" target="_blank">詳しい使い方はこちら</a></p>' +
-      '<p class="row" style="margin-top:6px"><button class="primary" id="newticket">＋ チケット作成</button> <button id="reload">更新</button> <button id="logout">接続をやり直す</button></p>' +
+      '<p class="row" style="margin-top:6px"><button class="primary" id="newticket">＋ チケット作成</button> <button id="reload">更新</button> ' +
+      (d.can_sync_ds ? '<button id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">🎨 デザインシステム同期</button> ' : "") +
+      '<button id="logout">接続をやり直す</button></p>' +
       (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<p class="mt sub">進行中の担当チケットはありません</p>') +
       msgHtml();
     app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { S.open = Number(c.dataset.seq); S.msg = null; render(); }));
     document.getElementById("newticket").onclick = () => { S.creating = true; S.msg = null; render(); };
+    const sds = document.getElementById("syncds");
+    if (sds) sds.onclick = () => {
+      S.msg = { t: "ok", text: "このファイルのCollectionsを読み取っています…" }; render();
+      parent.postMessage({ pluginMessage: { type: "read-design-system" } }, "*");
+    };
     document.getElementById("reload").onclick = load;
     document.getElementById("logout").onclick = () => { S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };
   }

@@ -62,6 +62,56 @@ figma.ui.onmessage = async (msg) => {
       }
     }
     figma.ui.postMessage({ type: "exported", requestId: msg.requestId, images });
+  } else if (msg.type === "read-design-system") {
+    // このファイルのVariable Collectionsとテキストスタイルを読み取ってUIへ返す。
+    // REST変数APIはEnterprise限定だが、プラグインAPIはプラン不問で読める
+    try {
+      const collections = await figma.variables.getLocalVariableCollectionsAsync();
+      const out = [];
+      for (const col of collections) {
+        const modeId = col.defaultModeId;
+        const vars = [];
+        for (const vid of col.variableIds) {
+          const v = await figma.variables.getVariableByIdAsync(vid);
+          if (!v) continue;
+          let value = v.valuesByMode[modeId];
+          let ref = null;
+          // エイリアス（役割→生値の参照）は参照先の名前を解決しつつ、実値まで辿る
+          let guard = 0;
+          while (value && value.type === "VARIABLE_ALIAS" && guard < 10) {
+            const target = await figma.variables.getVariableByIdAsync(value.id);
+            if (!target) break;
+            if (!ref) ref = target.name;
+            value = target.valuesByMode[Object.keys(target.valuesByMode)[0]];
+            guard++;
+          }
+          let hex = null;
+          let num = null;
+          if (v.resolvedType === "COLOR" && value && value.r !== undefined) {
+            const h = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+            hex = "#" + h(value.r) + h(value.g) + h(value.b);
+          } else if (v.resolvedType === "FLOAT" && typeof value === "number") {
+            num = value;
+          }
+          vars.push({ name: v.name, type: v.resolvedType, hex, num, ref, description: v.description || "" });
+        }
+        out.push({ collection: col.name, variables: vars });
+      }
+      const styles = await figma.getLocalTextStylesAsync();
+      const W = { thin: 100, extralight: 200, light: 300, regular: 400, medium: 500, semibold: 600, bold: 700, extrabold: 800, black: 900 };
+      const textStyles = styles.map((st) => {
+        const styleName = (st.fontName && st.fontName.style ? st.fontName.style : "").toLowerCase().replace(/\s/g, "");
+        let weight = 400;
+        for (const k in W) if (styleName.includes(k)) { weight = W[k]; }
+        let lh = 0;
+        if (st.lineHeight && st.lineHeight.unit === "PIXELS") lh = Math.round((st.lineHeight.value / st.fontSize) * 100) / 100;
+        else if (st.lineHeight && st.lineHeight.unit === "PERCENT") lh = Math.round(st.lineHeight.value) / 100;
+        return { name: st.name, size: st.fontSize, weight, lineHeight: lh, usage: st.description || "" };
+      });
+      figma.ui.postMessage({ type: "design-system", ok: true, fileName: figma.root.name, collections: out, textStyles });
+    } catch (e) {
+      figma.ui.postMessage({ type: "design-system", ok: false, error: String(e) });
+    }
   } else if (msg.type === "goto-node") {
     // 同一ファイル内なら該当ノードへジャンプ（ページ切替+スクロール&ズーム+選択）
     try {

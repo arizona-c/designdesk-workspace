@@ -40,7 +40,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, msg: null };
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, msg: null };
   const API = "https://designdesk.arizona-c.com/api/plugin";
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
@@ -145,17 +145,55 @@
 
   function renderTickets() {
     const d = S.data;
+    if (S.creating) { renderCreate(); return; }
     if (S.open != null) { renderDetail(); return; }
     const faqUrl = "https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/faq#" + encodeURIComponent("Figmaプラグイン");
     app.innerHTML =
       "<h1>" + esc(d.project.name) + " — 自分のチケット</h1>" +
       '<p class="sub">' + esc(d.user.name) + ' さん｜ログイン中 / <a href="' + faqUrl + '" target="_blank">詳しい使い方はこちら</a></p>' +
-      '<p class="row" style="margin-top:6px"><button id="reload">更新</button> <button id="logout">接続をやり直す</button></p>' +
+      '<p class="row" style="margin-top:6px"><button class="primary" id="newticket">＋ チケット作成</button> <button id="reload">更新</button> <button id="logout">接続をやり直す</button></p>' +
       (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<p class="mt sub">進行中の担当チケットはありません</p>') +
       msgHtml();
     app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { S.open = Number(c.dataset.seq); S.msg = null; render(); }));
+    document.getElementById("newticket").onclick = () => { S.creating = true; S.msg = null; render(); };
     document.getElementById("reload").onclick = load;
     document.getElementById("logout").onclick = () => { S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };
+  }
+
+  function renderCreate() {
+    const selInfo = S.selection.length
+      ? "選択中のFrame（" + S.selection.map((n) => esc(n.name)).join(" / ") + "）を自動で紐づけ、Beforeキャプチャも記録します"
+      : "Frameを選択してから作成すると、自動で紐づけ+Beforeキャプチャが記録されます（選択なしでも作成OK）";
+    app.innerHTML =
+      '<p><a href="#" id="back">← 一覧へ</a></p>' +
+      "<h1>チケット作成</h1>" +
+      '<p class="sub">あなたが担当者として「未着手」に登録されます</p>' +
+      '<input id="nt-title" placeholder="タイトル（対象＋やること）">' +
+      '<textarea id="nt-desc" placeholder="メモ（なぜ気になったか・完了条件など。任意）" style="width:100%;box-sizing:border-box;margin-top:6px;min-height:64px;padding:6px 8px;font:inherit;border:1px solid var(--figma-color-border,#ccc);border-radius:5px;background:var(--figma-color-bg,#fff);color:inherit"></textarea>' +
+      '<p class="mt sub">' + selInfo + "</p>" +
+      '<p class="mt"><button class="primary" id="nt-create">作成する</button></p>' +
+      msgHtml();
+    document.getElementById("back").onclick = (e) => { e.preventDefault(); S.creating = false; render(); };
+    document.getElementById("nt-create").onclick = async () => {
+      const title = document.getElementById("nt-title").value.trim();
+      const description = document.getElementById("nt-desc").value.trim();
+      if (!title) { S.msg = { t: "err", text: "タイトルを入れてください" }; render(); return; }
+      const sel = S.selection.slice();
+      const urls = S.fileKey ? sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-")) : [];
+      try {
+        S.msg = { t: "ok", text: "作成しています…" }; render();
+        const r = await api("POST", null, { action: "create", title, description, urls });
+        parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        if (sel.length && S.fileKey) {
+          const ok = await uploadCaptures(r.seq, "before", sel.map((n) => n.id));
+          if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "Beforeキャプチャ" + ok + "件を記録しました" } }, "*");
+        }
+        await load();
+        S.creating = false;
+        S.open = r.seq;
+      } catch (err) { S.msg = { t: "err", text: err.message }; }
+      render();
+    };
   }
 
   function renderDetail() {

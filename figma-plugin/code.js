@@ -62,5 +62,20 @@ figma.ui.onmessage = async (msg) => {
       }
     }
     figma.ui.postMessage({ type: "exported", requestId: msg.requestId, images });
+  } else if (msg.type === "goto-node") {
+    // 同一ファイル内なら該当ノードへジャンプ（ページ切替+スクロール&ズーム+選択）
+    try {
+      const node = await figma.getNodeByIdAsync(msg.nodeId);
+      if (!node) throw new Error("not found");
+      let page = node;
+      while (page && page.type !== "PAGE") page = page.parent;
+      if (page && page.type === "PAGE") await figma.setCurrentPageAsync(page);
+      figma.viewport.scrollAndZoomIntoView([node]);
+      figma.currentPage.selection = [node];
+      figma.notify("移動しました: " + node.name);
+      figma.ui.postMessage({ type: "goto-result", ok: true });
+    } catch (e) {
+      figma.ui.postMessage({ type: "goto-result", ok: false, url: msg.url });
+    }
   }
 };

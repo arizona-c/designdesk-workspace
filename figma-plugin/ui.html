@@ -62,6 +62,8 @@
     if (m.type === "exported") {
       const w = exportWaiters[m.requestId];
       if (w) { delete exportWaiters[m.requestId]; w(m.images); }
+    } else if (m.type === "goto-result") {
+      if (!m.ok && m.url) window.open(m.url, "_blank");
     } else if (m.type === "settings") {
       S.token = m.token; S.project = m.project; S.fileKey = m.fileKey; S.fileName = m.fileName;
       if (S.token && S.project) load(); else render();
@@ -166,16 +168,31 @@
       '<p><a href="#" id="back">← 一覧へ</a></p>' +
       "<h1>#" + t.seq + " " + esc(t.title) + "</h1>" +
       '<div class="row"><span class="chip">' + esc(t.column) + '</span><span class="chip' + (t.role === "レビュー" ? " rev" : "") + '">' + esc(t.role) + "</span></div>" +
-      (t.frames.length ? '<p class="mt frames">紐づけ済み:<br>' + t.frames.map(esc).join("<br>") + "</p>" : "") +
+      (t.frames.length
+        ? '<p class="mt frames">紐づけ済み（クリックで移動）:<br>' +
+          t.frames.map((u, i) => '<a href="#" class="frame-link" data-url="' + esc(u) + '">🔗 Frame ' + (i + 1) + "</a>").join("<br>") +
+          "</p>"
+        : "") +
       '<p class="mt sub">' + selInfo + "</p>" +
       (needKey
         ? '<p class="sub">初回だけ: このファイルのURL（ブラウザのアドレス欄からコピー）を貼ってください。選択したFrameへのリンクを作るために必要です。次からは聞かれません。</p>' +
           '<input id="fileurl" placeholder="https://www.figma.com/design/…">' +
-          '<p class="mt"><button id="savekey">URLを保存</button></p>'
+          '<p class="mt"><button id="savekey">URLを追加</button></p>'
         : '<p class="mt"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + ">選択中のFrameを紐づける</button></p>") +
-      '<p class="mt row"><button id="doing">作業中へ</button><button id="review">レビューへ提出</button></p>' +
+      '<p class="mt row"><span class="sub">状態:</span><select id="status">' +
+      S.data.columns.map((c) => '<option value="' + esc(c.name) + '"' + (c.name === t.column ? " selected" : "") + ">" + esc(c.name) + (c.role === "review" ? "（提出）" : "") + "</option>").join("") +
+      "</select></p>" +
       msgHtml();
     document.getElementById("back").onclick = (e) => { e.preventDefault(); S.open = null; render(); };
+    app.querySelectorAll(".frame-link").forEach((a) => {
+      a.onclick = (e) => {
+        e.preventDefault();
+        const url = a.dataset.url;
+        const m2 = url.match(/node-id=([\d]+)-([\d]+)/);
+        if (m2) parent.postMessage({ pluginMessage: { type: "goto-node", nodeId: m2[1] + ":" + m2[2], url } }, "*");
+        else window.open(url, "_blank");
+      };
+    });
     const sk = document.getElementById("savekey");
     if (sk) sk.onclick = () => {
       const m2 = (document.getElementById("fileurl").value || "").match(/figma\.com\/(?:design|file)\/([A-Za-z0-9]+)/);
@@ -197,25 +214,29 @@
       } catch (err) { S.msg = { t: "err", text: err.message }; }
       render();
     };
-    document.getElementById("doing").onclick = () => move(t.seq, "doing");
-    document.getElementById("review").onclick = async () => {
-      // 提出の瞬間に、紐づけ済みFrameのAfterキャプチャを撮ってから移動する
-      const ids = t.frames
-        .map((u) => { const m2 = u.match(/node-id=([\d]+)-([\d]+)/); return m2 ? m2[1] + ":" + m2[2] : null; })
-        .filter(Boolean);
-      if (ids.length && S.fileKey) {
-        S.msg = { t: "ok", text: "Afterキャプチャを記録しています…" };
-        render();
-        const ok = await uploadCaptures(t.seq, "after", ids);
-        if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "Afterキャプチャ" + ok + "件を記録しました" } }, "*");
+    document.getElementById("status").onchange = async (e) => {
+      const toName = e.target.value;
+      if (toName === t.column) return;
+      const toRole = (S.data.columns.find((c) => c.name === toName) || {}).role;
+      // レビュー役割の列へ変える時は、提出の瞬間にAfterキャプチャを撮ってから移動
+      if (toRole === "review") {
+        const ids = t.frames
+          .map((u) => { const m2 = u.match(/node-id=([\d]+)-([\d]+)/); return m2 ? m2[1] + ":" + m2[2] : null; })
+          .filter(Boolean);
+        if (ids.length && S.fileKey) {
+          S.msg = { t: "ok", text: "Afterキャプチャを記録しています…" };
+          render();
+          const ok = await uploadCaptures(t.seq, "after", ids);
+          if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "Afterキャプチャ" + ok + "件を記録しました" } }, "*");
+        }
       }
-      move(t.seq, "review");
+      move(t.seq, toName);
     };
   }
 
-  async function move(seq, to) {
+  async function move(seq, toName) {
     try {
-      const r = await api("POST", null, { action: "move", seq, to });
+      const r = await api("POST", null, { action: "move", seq, column: toName });
       S.msg = { t: "ok", text: r.message };
       parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
       await load(); S.open = seq;

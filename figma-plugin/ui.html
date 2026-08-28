@@ -166,8 +166,8 @@
 
   function renderCreate() {
     const selInfo = S.selection.length
-      ? "選択中のFrame（" + S.selection.map((n) => esc(n.name)).join(" / ") + "）を自動で紐づけ、Beforeキャプチャも記録します"
-      : "Frameを選択してから作成すると、自動で紐づけ+Beforeキャプチャが記録されます（選択なしでも作成OK）";
+      ? "選択中のFrame（" + S.selection.map((n) => esc(n.name)).join(" / ") + "）を自動で紐づけます"
+      : "Frameを選択してから作成すると自動で紐づけます（選択なしでも作成OK）";
     app.innerHTML =
       '<p><a href="#" id="back">← 一覧へ</a></p>' +
       "<h1>チケット作成</h1>" +
@@ -188,10 +188,6 @@
         S.msg = { t: "ok", text: "作成しています…" }; render();
         const r = await api("POST", null, { action: "create", title, description, urls });
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
-        if (sel.length && S.fileKey) {
-          const ok = await uploadCaptures(r.seq, "before", sel.map((n) => n.id));
-          if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "Beforeキャプチャ" + ok + "件を記録しました" } }, "*");
-        }
         await load();
         S.creating = false;
         S.open = r.seq;
@@ -253,10 +249,7 @@
         const sel = S.selection.slice();
         const urls = sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
         const r = await api("POST", null, { action: "attach_frames", seq: t.seq, urls });
-        S.msg = { t: "ok", text: r.message + "（Beforeキャプチャを記録中…）" };
-        render();
-        const ok = await uploadCaptures(t.seq, "before", sel.map((n) => n.id));
-        S.msg = { t: "ok", text: r.message + (ok ? ` / Beforeキャプチャ${ok}件を記録しました` : "") };
+        S.msg = { t: "ok", text: r.message };
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         await load(); S.open = t.seq;
       } catch (err) { S.msg = { t: "err", text: err.message }; }
@@ -280,22 +273,9 @@
     };
     const capcancel = document.getElementById("capcancel");
     if (capcancel) capcancel.onclick = () => { S.capturing = false; render(); };
-    document.getElementById("status").onchange = async (e) => {
+    document.getElementById("status").onchange = (e) => {
       const toName = e.target.value;
       if (toName === t.column) return;
-      const toRole = (S.data.columns.find((c) => c.name === toName) || {}).role;
-      // レビュー役割の列へ変える時は、提出の瞬間にAfterキャプチャを撮ってから移動
-      if (toRole === "review") {
-        const ids = t.frames
-          .map((u) => { const m2 = u.match(/node-id=([\d]+)-([\d]+)/); return m2 ? m2[1] + ":" + m2[2] : null; })
-          .filter(Boolean);
-        if (ids.length && S.fileKey) {
-          S.msg = { t: "ok", text: "Afterキャプチャを記録しています…" };
-          render();
-          const ok = await uploadCaptures(t.seq, "after", ids);
-          if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "Afterキャプチャ" + ok + "件を記録しました" } }, "*");
-        }
-      }
       move(t.seq, toName);
     };
   }

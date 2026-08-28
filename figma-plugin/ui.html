@@ -179,7 +179,8 @@
         ? '<p class="sub">初回だけ: このファイルのURL（ブラウザのアドレス欄からコピー）を貼ってください。選択したFrameへのリンクを作るために必要です。次からは聞かれません。</p>' +
           '<input id="fileurl" placeholder="https://www.figma.com/design/…">' +
           '<p class="mt"><button id="savekey">URLを追加</button></p>'
-        : '<p class="mt"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + ">選択中のFrameを紐づける</button></p>") +
+        : '<p class="mt row"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + '>選択中のFrameを紐づける</button>' +
+          '<button id="capture"' + (S.selection.length ? "" : " disabled") + ' title="選択中のFrameのキャプチャを撮って、このチケットに貼ります">📸 キャプチャを撮る</button></p>') +
       '<p class="mt row"><span class="sub">状態:</span><select id="status">' +
       S.data.columns.map((c) => '<option value="' + esc(c.name) + '"' + (c.name === t.column ? " selected" : "") + ">" + esc(c.name) + (c.role === "review" ? "（提出）" : "") + "</option>").join("") +
       "</select></p>" +
@@ -213,6 +214,18 @@
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         await load(); S.open = t.seq;
       } catch (err) { S.msg = { t: "err", text: err.message }; }
+      render();
+    };
+    const cap = document.getElementById("capture");
+    if (cap) cap.onclick = async () => {
+      const sel = S.selection.slice();
+      S.msg = { t: "ok", text: "キャプチャを記録しています…" };
+      render();
+      const ok = await uploadCaptures(t.seq, "manual", sel.map((n) => n.id));
+      S.msg = ok
+        ? { t: "ok", text: "キャプチャ" + ok + "件をチケットに貼りました" }
+        : { t: "err", text: "キャプチャを記録できませんでした（サイズ超過の可能性）" };
+      if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "キャプチャ" + ok + "件を記録しました" } }, "*");
       render();
     };
     document.getElementById("status").onchange = async (e) => {

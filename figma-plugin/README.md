@@ -6,9 +6,9 @@ Figmaの中から、自分のチケットの確認・選択中Frameの紐づけ�
 ## 導入手順（1人1回・約1分）
 
 1. **Figmaデスクトップアプリ**で任意のファイルを開く（ブラウザ版では導入不可）
-2. メニュー → Plugins → Development → **Import plugin from manifest…**
+2. メニュー → Plugins（プラグイン）→ Development（開発）→ **Import plugin from manifest…（マニフェストからプラグインをインポート…）**
 3. このフォルダの `manifest.json` を選択
-4. Plugins → Development → **Design Desk** で起動
+4. Plugins（プラグイン）→ Development（開発）→ **Design Desk** で起動
 5. 初回はプロジェクトID（例: app-dev）と、プラグイン用に発行した個人アクセストークンを入力
    （アカウントメニュー→アクセストークンで「Figmaプラグイン」の名前で発行。既存トークンは無効にならない）
 

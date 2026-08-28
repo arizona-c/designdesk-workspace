@@ -40,7 +40,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, msg: null };
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, msg: null };
   const API = "https://designdesk.arizona-c.com/api/plugin";
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
@@ -83,12 +83,16 @@
     return j;
   }
 
-  async function uploadCaptures(seq, phase, ids) {
+  async function uploadCaptures(seq, phase, ids, labelBase) {
     const images = await exportNodes(ids);
     let ok = 0;
-    for (const img of images) {
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      const name = labelBase
+        ? images.length > 1 ? labelBase + "-" + (i + 1) : labelBase
+        : img.name;
       try {
-        await api("POST", null, { action: "upload_capture", seq, phase, node_name: img.name, data: img.data });
+        await api("POST", null, { action: "upload_capture", seq, phase, node_name: name, data: img.data });
         ok++;
       } catch (err) { /* サイズ超過等はスキップして続行 */ }
     }
@@ -218,7 +222,11 @@
           '<input id="fileurl" placeholder="https://www.figma.com/design/…">' +
           '<p class="mt"><button id="savekey">URLを追加</button></p>'
         : '<p class="mt row"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + '>選択中のFrameを紐づける</button>' +
-          '<button id="capture"' + (S.selection.length ? "" : " disabled") + ' title="選択中のFrameのキャプチャを撮って、このチケットに貼ります">📸 キャプチャを撮る</button></p>') +
+          '<button id="capture"' + (S.selection.length ? "" : " disabled") + ' title="選択中のFrameのキャプチャを撮って、このチケットに貼ります">📸 キャプチャを撮る</button></p>' +
+          (S.capturing
+            ? '<p class="mt row"><input id="capname" placeholder="キャプチャの名前（任意・空ならFrame名）" style="flex:1;min-width:120px;margin-top:0">' +
+              '<button class="primary" id="capgo">撮る</button><button id="capcancel">やめる</button></p>'
+            : "")) +
       '<p class="mt row"><span class="sub">状態:</span><select id="status">' +
       S.data.columns.map((c) => '<option value="' + esc(c.name) + '"' + (c.name === t.column ? " selected" : "") + ">" + esc(c.name) + (c.role === "review" ? "（提出）" : "") + "</option>").join("") +
       "</select></p>" +
@@ -255,17 +263,23 @@
       render();
     };
     const cap = document.getElementById("capture");
-    if (cap) cap.onclick = async () => {
+    if (cap) cap.onclick = () => { S.capturing = !S.capturing; render(); if (S.capturing) { const el = document.getElementById("capname"); if (el) el.focus(); } };
+    const capgo = document.getElementById("capgo");
+    if (capgo) capgo.onclick = async () => {
+      const label = (document.getElementById("capname").value || "").trim();
       const sel = S.selection.slice();
+      S.capturing = false;
       S.msg = { t: "ok", text: "キャプチャを記録しています…" };
       render();
-      const ok = await uploadCaptures(t.seq, "manual", sel.map((n) => n.id));
+      const ok = await uploadCaptures(t.seq, "manual", sel.map((n) => n.id), label || null);
       S.msg = ok
         ? { t: "ok", text: "キャプチャ" + ok + "件をチケットに貼りました" }
         : { t: "err", text: "キャプチャを記録できませんでした（サイズ超過の可能性）" };
       if (ok) parent.postMessage({ pluginMessage: { type: "notify", message: "キャプチャ" + ok + "件を記録しました" } }, "*");
       render();
     };
+    const capcancel = document.getElementById("capcancel");
+    if (capcancel) capcancel.onclick = () => { S.capturing = false; render(); };
     document.getElementById("status").onchange = async (e) => {
       const toName = e.target.value;
       if (toName === t.column) return;

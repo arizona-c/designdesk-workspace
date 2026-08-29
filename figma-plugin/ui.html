@@ -36,6 +36,15 @@
   .frames { font-size: 9px; color: var(--figma-color-text-secondary, #777); word-break: break-all; }
 </style>
 
+<!-- ブランドバー: アプリのfaviconと同じセリフDロゴ（開発版プラグインはFigmaメニュー側にアイコンを出せないため、UI内で示す） -->
+<div style="display:flex;align-items:center;gap:6px;margin:0 0 10px;">
+  <svg width="16" height="16" viewBox="0 0 80 81" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="0.5" y="0.5" width="79" height="79" rx="15.5" fill="#FBF7EF" stroke="#D0D0D0"/>
+    <path d="M18.8516 17.8125H39.5938C44.7969 17.8125 49.3438 19.0547 53.2344 21.5391C59.1406 25.3828 62.0938 31.2188 62.0938 39.0469C62.0938 45.1875 60.0312 50.2031 55.9062 54.0938C51.6875 58.0312 46.3203 60 39.8047 60H18.8516V58.1016H24.4766V19.7109H18.8516V17.8125ZM39.8047 19.7109H34.3203V58.1016H39.6641C41.8672 58.1016 43.7188 57.6562 45.2188 56.7656C49.1094 54.4688 51.0547 48.4453 51.0547 38.6953C51.0547 33.8203 50.5859 29.9062 49.6484 26.9531C48.0078 22.125 44.7266 19.7109 39.8047 19.7109Z" fill="black"/>
+  </svg>
+  <span style="font-weight:700;font-size:11px;letter-spacing:.2px;">Design Desk</span>
+</div>
+
 <div id="app">読み込み中…</div>
 
 <script>
@@ -133,7 +142,7 @@
 
   function renderSetup() {
     app.innerHTML =
-      "<h1>Design Desk につなぐ</h1>" +
+      "<h1>アカウントにつなぐ</h1>" +
       '<p class="sub">Design Desk のアカウントメニュー →「アクセストークン」で発行した dd_pat_… を貼り付けてください。</p>' +
       '<input id="project" placeholder="プロジェクトID（ディレクターから聞いた名前。例: app-dev）" value="' + esc(S.project || "") + '">' +
       '<input id="token" type="password" placeholder="dd_pat_…">' +
@@ -190,7 +199,7 @@
       '<p><a href="#" id="back">← 一覧へ</a></p>' +
       "<h1>チケット作成</h1>" +
       '<p class="sub">あなたが担当者として「未着手」に登録されます</p>' +
-      '<input id="nt-title" placeholder="タイトル（対象＋やること）">' +
+      '<input id="nt-title" placeholder="タイトル：対象＋やること（略号や内部用語は避けて平易に）">' +
       '<textarea id="nt-desc" placeholder="メモ（なぜ気になったか・完了条件など。任意）" style="width:100%;box-sizing:border-box;margin-top:6px;min-height:64px;padding:6px 8px;font:inherit;border:1px solid var(--figma-color-border,#ccc);border-radius:5px;background:var(--figma-color-bg,#fff);color:inherit"></textarea>' +
       '<p class="mt sub">' + selInfo + "</p>" +
       '<p class="mt"><button class="primary" id="nt-create">作成する</button></p>' +

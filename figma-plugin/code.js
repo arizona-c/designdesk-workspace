@@ -16,6 +16,7 @@ figma.clientStorage.getAsync("dd_uisize").then((saved) => {
 async function sendSettings() {
   const token = await figma.clientStorage.getAsync("dd_token");
   const project = await figma.clientStorage.getAsync("dd_project");
+  const sort = (await figma.clientStorage.getAsync("dd_sort")) || "list";
   // fileKeyは開発版プラグインでは取れないことがある → その場合はUIでURL貼り付けを促し、ファイル毎に保存
   let fileKey = figma.fileKey || null;
   if (!fileKey) {
@@ -27,6 +28,7 @@ async function sendSettings() {
     project: project || null,
     fileKey: fileKey,
     fileName: figma.root.name,
+    sort: sort,
   });
 }
 
@@ -61,6 +63,8 @@ figma.ui.onmessage = async (msg) => {
       height: Math.max(UI_MIN_H, Math.min(UI_MAX_H, msg.height)),
     };
     figma.ui.resize(uiSize.width, uiSize.height);
+  } else if (msg.type === "save-sort") {
+    await figma.clientStorage.setAsync("dd_sort", msg.sort);
   } else if (msg.type === "resize-save") {
     await figma.clientStorage.setAsync("dd_uisize", uiSize);
   } else if (msg.type === "export-nodes") {

@@ -152,7 +152,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false };
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, comments: null, commentsFor: null, commentBusy: false };
   const API = "https://designdesk.arizona-c.com/api/plugin";
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
@@ -166,6 +166,8 @@
     pencil: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
     left: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
     target: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
+    external: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+    send: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
   };
 
   // ---- Figma本体との通信 ----
@@ -234,6 +236,14 @@
       } catch (err) { /* サイズ超過等はスキップして続行 */ }
     }
     return ok;
+  }
+
+  async function loadComments(seq) {
+    S.commentsFor = seq; S.comments = null;
+    try {
+      const r = await api("POST", null, { action: "comments", seq });
+      if (S.commentsFor === seq) { S.comments = r.comments; render(); }
+    } catch (err) { if (S.commentsFor === seq) { S.comments = []; render(); } }
   }
 
   async function load() {
@@ -336,7 +346,7 @@
           : '<div class="empty">' + (S.onlyDoing ? "作業中のチケットはありません" : "進行中の担当チケットはありません") + "</div>";
       })() +
       msgHtml());
-    app.querySelectorAll(".card").forEach((c) => (c.onclick = () => go({ open: Number(c.dataset.seq), msg: null }, "fwd")));
+    app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { const sq = Number(c.dataset.seq); loadComments(sq); go({ open: sq, msg: null }, "fwd"); }));
     document.getElementById("sort").onchange = (e) => {
       S.sort = e.target.value;
       parent.postMessage({ pluginMessage: { type: "save-sort", sort: S.sort } }, "*");
@@ -387,6 +397,7 @@
         await load();
         S.creating = false;
         S.open = r.seq;
+        loadComments(r.seq);
       } catch (err) { S.msg = { t: "err", text: err.message }; }
       render();
     };
@@ -423,7 +434,9 @@
     const needKey = !S.fileKey;
     app.innerHTML = viewWrap(
       '<div class="row" style="justify-content:space-between">' + backLink() +
-      '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></div>" +
+      '<span class="row" style="gap:10px">' +
+      '<a href="' + esc("https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DDで開く</a>" +
+      '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></span></div>" +
       '<div class="row mt" style="gap:5px"><span class="chip seq">#' + t.seq + '</span>' +
       '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +
       // 状態セレクター（チップの並びに溶け込むリスト移動）
@@ -454,6 +467,16 @@
             ? '<div class="row mt"><input id="capname" placeholder="キャプチャの名前（空ならFrame名）" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">' +
               '<button class="btn primary sm" id="capgo">撮る</button><button class="btn sm" id="capcancel">やめる</button></div>'
             : "")) +
+      "</div>" +
+
+      '<div class="section"><h2>コメント' + (S.comments ? "（" + S.comments.length + "）" : "") + "</h2>" +
+      (S.comments === null
+        ? '<p class="faint" style="font-size:11px;margin:0">読み込み中…</p>'
+        : S.comments.length
+          ? S.comments.map((c) => '<div style="margin-bottom:7px"><span class="faint" style="font-size:10px">' + esc(c.author) + " ・ " + esc(c.at) + '</span><div style="font-size:11px;white-space:pre-wrap;line-height:1.5">' + esc(c.body) + "</div></div>").join("")
+          : '<p class="faint" style="font-size:11px;margin:0 0 4px">まだコメントはありません</p>') +
+      '<textarea id="cm-body" placeholder="FBコメントを書く（担当者に通知されます）" style="min-height:44px;font-size:11px;margin-top:4px"></textarea>' +
+      '<p style="margin:6px 0 0;text-align:right"><button class="btn primary sm" id="cm-send"' + (S.commentBusy ? " disabled" : "") + ">" + I.send + "送信</button></p>" +
       "</div>" +
       msgHtml());
     document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ open: null }, "back"); };
@@ -515,6 +538,18 @@
     };
     const capcancel = document.getElementById("capcancel");
     if (capcancel) capcancel.onclick = () => { S.capturing = false; render(); };
+    document.getElementById("cm-send").onclick = async () => {
+      const el = document.getElementById("cm-body");
+      const text = el.value.trim();
+      if (!text || S.commentBusy) return;
+      S.commentBusy = true; render();
+      try {
+        const r = await api("POST", null, { action: "add_comment", seq: t.seq, body: text });
+        parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        S.commentBusy = false;
+        await loadComments(t.seq);
+      } catch (err) { S.commentBusy = false; S.msg = { t: "err", text: err.message }; render(); }
+    };
     document.getElementById("status").onchange = (e) => {
       const toName = e.target.value;
       if (toName === t.column) return;

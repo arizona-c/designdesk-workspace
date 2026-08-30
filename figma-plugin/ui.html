@@ -311,7 +311,7 @@
       "<h1 style=\"margin:0\">自分のチケット</h1>" +
       '<span class="faint" style="font-size:10px">' + esc(d.user.name) + " さん</span></div>" +
       '<div class="row mt">' +
-      '<button class="btn primary" id="newticket">' + I.plus + "チケット作成</button>" +
+      '<button class="btn primary sm" id="newticket">' + I.plus + "チケット作成</button>" +
       (d.can_sync_ds ? '<button class="btn sm" id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">' + I.palette + "DS同期</button>" : "") +
       '<button class="btn sm" id="logout" style="margin-left:auto">接続をやり直す</button></div>' +
       (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<div class="empty">進行中の担当チケットはありません</div>') +

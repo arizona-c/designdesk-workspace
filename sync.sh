@@ -28,15 +28,27 @@ sync_designdesk() {
     return 0
   fi
   mkdir -p .claude
-  if curl -fsS -m 10 -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
+  local hdrs=".claude/.sync-headers.tmp"
+  if curl -fsS -m 10 -D "$hdrs" -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
     "$DESIGNDESK_URL/api/sync/claude-md?project=$DESIGNDESK_PROJECT" \
     -o .claude/designdesk-rules.md.tmp; then
     mv .claude/designdesk-rules.md.tmp .claude/designdesk-rules.md
     echo "✅ Design Desk のルールを同期しました（$(head -1 .claude/designdesk-rules.md | sed 's/# //')）"
+    # 起動サマリ: 自分の進行中チケットとAIレビュー待機（ヘッダーから取得）
+    local my pend
+    my=$(grep -i '^x-dd-my-tickets:' "$hdrs" | tr -dc '0-9')
+    pend=$(grep -i '^x-dd-pending-ai-reviews:' "$hdrs" | tr -dc '0-9')
+    if [ -n "$my" ]; then
+      echo "📋 あなたの進行中チケット: ${my}件 / AIレビュー待機: ${pend:-0}件"
+      if [ "${pend:-0}" -gt 0 ]; then
+        echo "   → Claudeに「AIレビュー実行」と伝えると、待機中の検査を行います"
+      fi
+    fi
   else
     rm -f .claude/designdesk-rules.md.tmp
     echo "⚠ Design Desk 同期に失敗（オフライン/トークン無効?）。前回のルールのまま続行します"
   fi
+  rm -f "$hdrs"
 
   # Design Desk のチケット操作ツール（MCP）の接続設定を生成する。
   # トークンを含むためコミットされない（.gitignore済み）。初回生成時は次回の起動から有効

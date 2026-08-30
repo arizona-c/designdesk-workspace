@@ -435,7 +435,7 @@
     app.innerHTML = viewWrap(
       '<div class="row" style="justify-content:space-between">' + backLink() +
       '<span class="row" style="gap:10px">' +
-      '<a href="' + esc("https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DDで開く</a>" +
+      '<a href="' + esc("https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DesignDeskで開く</a>" +
       '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></span></div>" +
       '<div class="row mt" style="gap:5px"><span class="chip seq">#' + t.seq + '</span>' +
       '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +
@@ -467,6 +467,12 @@
             ? '<div class="row mt"><input id="capname" placeholder="キャプチャの名前（空ならFrame名）" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">' +
               '<button class="btn primary sm" id="capgo">撮る</button><button class="btn sm" id="capcancel">やめる</button></div>'
             : "")) +
+      "</div>" +
+
+      '<div class="section"><h2>作業報告</h2>' +
+      '<p class="faint" style="font-size:10px;margin:0 0 4px">作業が完了したらここに完了報告を書きます。レビュー時に最上位に表示されます</p>' +
+      '<textarea id="rp-body" placeholder="変更点・対象画面・確認したこと・気になる点（簡潔・事実ベースで）" style="min-height:56px;font-size:11px">' + esc(t.report || "") + "</textarea>" +
+      '<p style="margin:6px 0 0;text-align:right"><button class="btn primary sm" id="rp-save">保存</button></p>' +
       "</div>" +
 
       '<div class="section"><h2>コメント' + (S.comments ? "（" + S.comments.length + "）" : "") + "</h2>" +
@@ -538,6 +544,16 @@
     };
     const capcancel = document.getElementById("capcancel");
     if (capcancel) capcancel.onclick = () => { S.capturing = false; render(); };
+    document.getElementById("rp-save").onclick = async () => {
+      const text = document.getElementById("rp-body").value.trim();
+      if (!text) { S.msg = { t: "err", text: "作業報告を入力してください" }; render(); return; }
+      try {
+        const r = await api("POST", null, { action: "save_report", seq: t.seq, report: text });
+        parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        await load(); S.open = t.seq; S.msg = { t: "ok", text: r.message };
+      } catch (err) { S.msg = { t: "err", text: err.message }; }
+      render();
+    };
     document.getElementById("cm-send").onclick = async () => {
       const el = document.getElementById("cm-body");
       const text = el.value.trim();

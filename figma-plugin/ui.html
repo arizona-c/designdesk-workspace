@@ -1,59 +1,174 @@
+<meta charset="utf-8">
 <style>
+  /* Design Deskのデザイン言語をプラグインに移植（2026-08-30 オーナー要望）。
+     zincベースの白黒基調 + 機能色チップ + カード。Figmaのライト/ダークは light-dark() で追従 */
   :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 12px; font: 11px/1.6 -apple-system, "Hiragino Sans", sans-serif;
-    background: var(--figma-color-bg, #fff); color: var(--figma-color-text, #111);
+    margin: 0; font: 12px/1.6 -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: light-dark(#fafafa, #2c2c31); color: light-dark(#18181b, #f4f4f5);
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
   }
-  h1 { font-size: 13px; margin: 0 0 4px; }
-  .sub { color: var(--figma-color-text-secondary, #777); }
-  input {
-    width: 100%; box-sizing: border-box; margin-top: 4px; padding: 6px 8px; font-size: 11px;
-    border: 1px solid var(--figma-color-border, #ccc); border-radius: 5px;
-    background: var(--figma-color-bg, #fff); color: inherit;
+  :root {
+    --ink-mid: light-dark(#71717a, #a1a1aa);
+    --ink-faint: light-dark(#a1a1aa, #71717a);
+    --line: light-dark(#e4e4e7, #44444a);
+    --line-strong: light-dark(#d4d4d8, #55555c);
+    --surface: light-dark(#ffffff, #1e1e23);
+    --surface2: light-dark(#f4f4f5, #38383e);
+    --btn: light-dark(#18181b, #e4e4e7);
+    --btn-ink: light-dark(#ffffff, #18181b);
+    --link: light-dark(#2563eb, #60a5fa);
+    --amber-bg: light-dark(#fef3c7, #451a03);
+    --amber-ink: light-dark(#92400e, #fcd34d);
+    --blue-bg: light-dark(#dbeafe, #172554);
+    --blue-ink: light-dark(#1d4ed8, #93c5fd);
+    --red: light-dark(#b91c1c, #fca5a5);
+    --green: light-dark(#047857, #6ee7b7);
   }
-  button {
-    padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 5px; cursor: pointer;
-    border: 1px solid var(--figma-color-border, #ccc); background: var(--figma-color-bg, #fff); color: inherit;
+  .sub { color: var(--ink-mid); }
+  .faint { color: var(--ink-faint); }
+
+  /* ヘッダー（スティッキー） */
+  header {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 7px;
+    padding: 10px 12px; background: var(--surface); border-bottom: 1px solid var(--line);
   }
-  button.primary { background: #18a0fb; border-color: #18a0fb; color: #fff; }
-  button:disabled { opacity: .4; cursor: default; }
+  header .brand { font-weight: 700; font-size: 12px; letter-spacing: .2px; }
+  header .proj {
+    max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 10px; color: var(--ink-mid); background: var(--surface2);
+    border-radius: 99px; padding: 2px 8px;
+  }
+  header .spacer { flex: 1; }
+  .iconbtn {
+    display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+    border: none; background: none; border-radius: 6px; color: var(--ink-faint); cursor: pointer; padding: 0;
+  }
+  .iconbtn:hover { background: var(--surface2); color: inherit; }
+
+  main { padding: 12px; }
+
+  h1 { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
+  h2 { font-size: 11px; font-weight: 700; margin: 14px 0 4px; }
+
+  input, textarea, select {
+    width: 100%; padding: 7px 9px; font: inherit; font-size: 12px;
+    border: 1px solid var(--line-strong); border-radius: 6px;
+    background: var(--surface); color: inherit; outline: none;
+  }
+  textarea { resize: vertical; min-height: 64px; field-sizing: content; max-height: 220px; }
+  select {
+    appearance: none; cursor: pointer; padding-right: 26px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%238b8b93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 11px;
+  }
+
+  button.btn {
+    display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; font: inherit;
+    font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: var(--surface); color: inherit;
+  }
+  button.btn:hover { background: var(--surface2); }
+  button.btn.primary { background: var(--btn); border-color: var(--btn); color: var(--btn-ink); }
+  button.btn.primary:hover { opacity: .85; }
+  button.btn.sm { padding: 4px 9px; font-size: 11px; font-weight: 500; }
+  button:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
+  /* チケットカード（アプリのボードカードと同じ流儀） */
   .card {
-    border: 1px solid var(--figma-color-border, #ddd); border-radius: 8px;
-    padding: 8px 10px; margin-top: 6px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; margin-top: 8px; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color .12s;
   }
-  .card:hover { border-color: #18a0fb; }
+  .card:hover { border-color: var(--line-strong); }
   .chip {
-    display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700;
-    background: var(--figma-color-bg-secondary, #f0f0f0); color: var(--figma-color-text-secondary, #777);
+    display: inline-flex; align-items: center; padding: 1.5px 6px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; background: var(--surface2); color: var(--ink-mid);
   }
-  .chip.rev { background: #fff3cd; color: #8a6d1a; }
+  .chip.seq { font-weight: 600; font-family: ui-monospace, monospace; }
+  .chip.rev { background: var(--amber-bg); color: var(--amber-ink); }
+  .chip.own { background: var(--blue-bg); color: var(--blue-ink); }
+  .card .title { margin-top: 4px; font-weight: 500; line-height: 1.45; }
+  .card .meta { margin-top: 5px; font-size: 10px; color: var(--ink-faint); display: flex; gap: 8px; align-items: center; }
+
   .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .mt { margin-top: 10px; }
-  .msg { margin-top: 8px; font-size: 10px; }
-  .msg.err { color: #e03e3e; }
-  .msg.ok { color: #1a7f37; }
-  a { color: #18a0fb; text-decoration: none; }
-  .frames { font-size: 9px; color: var(--figma-color-text-secondary, #777); word-break: break-all; }
+  .msg { margin-top: 10px; font-size: 11px; line-height: 1.5; }
+  .msg.err { color: var(--red); }
+  .msg.ok { color: var(--green); }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* 詳細のセクション枠 */
+  .section { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; margin-top: 8px; }
+  .section h2 { margin: 0 0 6px; }
+  .framelink { display: flex; align-items: center; gap: 5px; font-size: 11px; margin-top: 3px; }
+
+  /* 画面遷移（一覧⇄詳細のスライド感） */
+  .view { animation: slidein .16s ease-out; }
+  @keyframes slidein { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+  .view.back { animation: slideback .16s ease-out; }
+  @keyframes slideback { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+
+  .backlink { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--ink-mid); cursor: pointer; }
+  .backlink:hover { color: inherit; text-decoration: none; }
+
+  .empty {
+    margin-top: 14px; padding: 18px 12px; text-align: center; font-size: 11px; color: var(--ink-faint);
+    border: 1px dashed var(--line-strong); border-radius: 8px;
+  }
+
+  /* リサイズハンドル（右下ドラッグ→figma.ui.resize） */
+  #resizer {
+    position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 9;
+  }
+  #resizer::after {
+    content: ""; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px;
+    border-right: 2px solid var(--line-strong); border-bottom: 2px solid var(--line-strong);
+    border-radius: 1px;
+  }
 </style>
 
-<!-- ブランドバー: アプリのfaviconと同じセリフDロゴ（開発版プラグインはFigmaメニュー側にアイコンを出せないため、UI内で示す） -->
-<div style="display:flex;align-items:center;gap:6px;margin:0 0 10px;">
-  <svg width="16" height="16" viewBox="0 0 80 81" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<header>
+  <!-- ブランド: アプリのfaviconと同じセリフDロゴ（開発版はFigmaメニュー側にアイコンを出せないためUI内で示す） -->
+  <svg width="18" height="18" viewBox="0 0 80 81" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <rect x="0.5" y="0.5" width="79" height="79" rx="15.5" fill="#FBF7EF" stroke="#D0D0D0"/>
     <path d="M18.8516 17.8125H39.5938C44.7969 17.8125 49.3438 19.0547 53.2344 21.5391C59.1406 25.3828 62.0938 31.2188 62.0938 39.0469C62.0938 45.1875 60.0312 50.2031 55.9062 54.0938C51.6875 58.0312 46.3203 60 39.8047 60H18.8516V58.1016H24.4766V19.7109H18.8516V17.8125ZM39.8047 19.7109H34.3203V58.1016H39.6641C41.8672 58.1016 43.7188 57.6562 45.2188 56.7656C49.1094 54.4688 51.0547 48.4453 51.0547 38.6953C51.0547 33.8203 50.5859 29.9062 49.6484 26.9531C48.0078 22.125 44.7266 19.7109 39.8047 19.7109Z" fill="black"/>
   </svg>
-  <span style="font-weight:700;font-size:11px;letter-spacing:.2px;">Design Desk</span>
-</div>
+  <span class="brand">Design Desk</span>
+  <span class="proj" id="hd-proj" style="display:none"></span>
+  <span class="spacer"></span>
+  <button class="iconbtn" id="hd-reload" title="更新" style="display:none">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+  </button>
+  <button class="iconbtn" id="hd-help" title="使い方FAQを開く" style="display:none">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>
+</header>
 
-<div id="app">読み込み中…</div>
+<main><div id="app">読み込み中…</div></main>
+<div id="resizer" title="ドラッグでサイズ変更"></div>
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null };
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd" };
   const API = "https://designdesk.arizona-c.com/api/plugin";
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
 
+  // ---- アイコン（UIコントロールに絵文字を使わない・アプリと同方針） ----
+  const I = {
+    plus: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    camera: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>',
+    palette: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
+    link: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+    pencil: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+    left: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+    target: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
+  };
+
+  // ---- Figma本体との通信 ----
   const exportWaiters = {};
   let exportSeq = 0;
   function exportNodes(ids) {
@@ -126,27 +241,44 @@
   }
 
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function go(patch, dir) { Object.assign(S, patch); S.dir = dir || "fwd"; render(); }
+
+  // ---- ヘッダー ----
+  function syncHeader() {
+    const proj = document.getElementById("hd-proj");
+    const reload = document.getElementById("hd-reload");
+    const help = document.getElementById("hd-help");
+    const connected = !!(S.token && S.project && S.data);
+    proj.style.display = connected ? "" : "none";
+    reload.style.display = connected ? "" : "none";
+    help.style.display = connected ? "" : "none";
+    if (connected) proj.textContent = S.data.project.name;
+    reload.onclick = load;
+    help.onclick = () => window.open("https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/faq#" + encodeURIComponent("Figmaプラグイン"), "_blank");
+  }
 
   function render() {
+    syncHeader();
     if (!S.token || !S.project) { renderSetup(); return; }
-    if (!S.data) { app.innerHTML = S.msg ? msgHtml() + retryBtn() : "読み込み中…"; bindRetry(); return; }
+    if (!S.data) { app.innerHTML = '<div class="view">' + (S.msg ? msgHtml() + retryBtn() : "読み込み中…") + "</div>"; bindRetry(); return; }
     renderTickets();
   }
 
+  function viewWrap(html) { return '<div class="view' + (S.dir === "back" ? " back" : "") + '">' + html + "</div>"; }
   function msgHtml() { return S.msg ? '<p class="msg ' + S.msg.t + '">' + esc(S.msg.text) + "</p>" : ""; }
-  function retryBtn() { return '<p class="mt"><button id="retry">再読み込み</button> <button id="logout">接続をやり直す</button></p>'; }
+  function retryBtn() { return '<p class="mt row"><button class="btn" id="retry">再読み込み</button><button class="btn sm" id="logout">接続をやり直す</button></p>'; }
   function bindRetry() {
     const r = document.getElementById("retry"); if (r) r.onclick = load;
     const l = document.getElementById("logout"); if (l) l.onclick = () => parent.postMessage({ pluginMessage: { type: "logout" } }, "*");
   }
 
   function renderSetup() {
-    app.innerHTML =
+    app.innerHTML = viewWrap(
       "<h1>アカウントにつなぐ</h1>" +
       '<p class="sub">Design Desk のアカウントメニュー →「アクセストークン」で発行した dd_pat_… を貼り付けてください。</p>' +
-      '<input id="project" placeholder="プロジェクトID（ディレクターから聞いた名前。例: app-dev）" value="' + esc(S.project || "") + '">' +
-      '<input id="token" type="password" placeholder="dd_pat_…">' +
-      '<p class="mt"><button class="primary" id="save">接続する</button></p>' + msgHtml();
+      '<div class="mt"><input id="project" placeholder="プロジェクトID（ディレクターから聞いた名前。例: app-dev）" value="' + esc(S.project || "") + '"></div>' +
+      '<div class="mt"><input id="token" type="password" placeholder="dd_pat_…"></div>' +
+      '<p class="mt"><button class="btn primary" id="save">接続する</button></p>' + msgHtml());
     document.getElementById("save").onclick = () => {
       const project = document.getElementById("project").value.trim();
       const token = document.getElementById("token").value.trim();
@@ -158,11 +290,14 @@
   function ticketCard(t) {
     return (
       '<div class="card" data-seq="' + t.seq + '">' +
-      '<div class="row"><span class="chip' + (t.role === "レビュー" ? " rev" : "") + '">' + esc(t.role) + "</span>" +
+      '<div class="row" style="gap:5px">' +
+      '<span class="chip seq">#' + t.seq + "</span>" +
+      '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +
       '<span class="chip">' + esc(t.column) + "</span>" +
-      (t.due ? '<span class="sub">期日 ' + esc(t.due.slice(5)) + "</span>" : "") + "</div>" +
-      '<div style="margin-top:2px"><b>#' + t.seq + "</b> " + esc(t.title) + "</div>" +
-      (t.frames.length ? '<div class="frames">🔗 Frame×' + t.frames.length + "</div>" : "") +
+      (t.due ? '<span class="faint" style="font-size:10px;margin-left:auto">期日 ' + esc(t.due.slice(5).replace("-", "/")) + "</span>" : "") +
+      "</div>" +
+      '<div class="title">' + esc(t.title) + "</div>" +
+      (t.frames.length ? '<div class="meta">' + I.link + " Frame×" + t.frames.length + "</div>" : "") +
       "</div>"
     );
   }
@@ -171,40 +306,44 @@
     const d = S.data;
     if (S.creating) { renderCreate(); return; }
     if (S.open != null) { renderDetail(); return; }
-    const faqUrl = "https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/faq#" + encodeURIComponent("Figmaプラグイン");
-    app.innerHTML =
-      "<h1>" + esc(d.project.name) + " — 自分のチケット</h1>" +
-      '<p class="sub">' + esc(d.user.name) + ' さん｜ログイン中 / <a href="' + faqUrl + '" target="_blank">詳しい使い方はこちら</a></p>' +
-      '<p class="row" style="margin-top:6px"><button class="primary" id="newticket">＋ チケット作成</button> <button id="reload">更新</button> ' +
-      (d.can_sync_ds ? '<button id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">🎨 デザインシステム同期</button> ' : "") +
-      '<button id="logout">接続をやり直す</button></p>' +
-      (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<p class="mt sub">進行中の担当チケットはありません</p>') +
-      msgHtml();
-    app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { S.open = Number(c.dataset.seq); S.msg = null; render(); }));
-    document.getElementById("newticket").onclick = () => { S.creating = true; S.msg = null; render(); };
+    app.innerHTML = viewWrap(
+      '<div class="row" style="justify-content:space-between">' +
+      "<h1 style=\"margin:0\">自分のチケット</h1>" +
+      '<span class="faint" style="font-size:10px">' + esc(d.user.name) + " さん</span></div>" +
+      '<div class="row mt">' +
+      '<button class="btn primary" id="newticket">' + I.plus + "チケット作成</button>" +
+      (d.can_sync_ds ? '<button class="btn sm" id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">' + I.palette + "DS同期</button>" : "") +
+      '<button class="btn sm" id="logout" style="margin-left:auto">接続をやり直す</button></div>' +
+      (d.tickets.length ? d.tickets.map(ticketCard).join("") : '<div class="empty">進行中の担当チケットはありません</div>') +
+      msgHtml());
+    app.querySelectorAll(".card").forEach((c) => (c.onclick = () => go({ open: Number(c.dataset.seq), msg: null }, "fwd")));
+    document.getElementById("newticket").onclick = () => go({ creating: true, msg: null }, "fwd");
     const sds = document.getElementById("syncds");
     if (sds) sds.onclick = () => {
       S.msg = { t: "ok", text: "このファイルのCollectionsを読み取っています…" }; render();
       parent.postMessage({ pluginMessage: { type: "read-design-system" } }, "*");
     };
-    document.getElementById("reload").onclick = load;
     document.getElementById("logout").onclick = () => { S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };
+  }
+
+  function backLink(label, onclick) {
+    return '<a class="backlink" id="back">' + I.left + (label || "一覧へ") + "</a>";
   }
 
   function renderCreate() {
     const selInfo = S.selection.length
       ? "選択中のFrame（" + S.selection.map((n) => esc(n.name)).join(" / ") + "）を自動で紐づけます"
       : "Frameを選択してから作成すると自動で紐づけます（選択なしでも作成OK）";
-    app.innerHTML =
-      '<p><a href="#" id="back">← 一覧へ</a></p>' +
-      "<h1>チケット作成</h1>" +
-      '<p class="sub">あなたが担当者として「未着手」に登録されます</p>' +
-      '<input id="nt-title" placeholder="タイトル：対象＋やること（略号や内部用語は避けて平易に）">' +
-      '<textarea id="nt-desc" placeholder="メモ（なぜ気になったか・完了条件など。任意）" style="width:100%;box-sizing:border-box;margin-top:6px;min-height:64px;padding:6px 8px;font:inherit;border:1px solid var(--figma-color-border,#ccc);border-radius:5px;background:var(--figma-color-bg,#fff);color:inherit"></textarea>' +
-      '<p class="mt sub">' + selInfo + "</p>" +
-      '<p class="mt"><button class="primary" id="nt-create">作成する</button></p>' +
-      msgHtml();
-    document.getElementById("back").onclick = (e) => { e.preventDefault(); S.creating = false; render(); };
+    app.innerHTML = viewWrap(
+      backLink() +
+      '<h1 class="mt">チケット作成</h1>' +
+      '<p class="sub">あなたが担当者としてインボックスに登録されます</p>' +
+      '<div class="mt"><input id="nt-title" placeholder="タイトル：対象＋やること（略号や内部用語は避けて平易に）"></div>' +
+      '<div class="mt"><textarea id="nt-desc" placeholder="メモ（なぜ気になったか・完了条件など。任意）"></textarea></div>' +
+      '<p class="mt sub" style="font-size:11px">' + selInfo + "</p>" +
+      '<p class="mt"><button class="btn primary" id="nt-create">作成する</button></p>' +
+      msgHtml());
+    document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ creating: false }, "back"); };
     document.getElementById("nt-create").onclick = async () => {
       const title = document.getElementById("nt-title").value.trim();
       const description = document.getElementById("nt-desc").value.trim();
@@ -227,16 +366,16 @@
     const t = S.data.tickets.find((x) => x.seq === S.open);
     if (!t) { S.open = null; render(); return; }
     if (S.editing) {
-      app.innerHTML =
-        '<p><a href="#" id="back">← 詳細へ戻る</a></p>' +
-        "<h1>#" + t.seq + " を編集</h1>" +
-        '<input id="ed-title" value="' + esc(t.title) + '">' +
-        '<textarea id="ed-desc" placeholder="説明" style="width:100%;box-sizing:border-box;margin-top:6px;min-height:96px;padding:6px 8px;font:inherit;border:1px solid var(--figma-color-border,#ccc);border-radius:5px;background:var(--figma-color-bg,#fff);color:inherit">' + esc(t.description || "") + "</textarea>" +
-        '<p class="mt row"><button class="primary" id="ed-save">保存</button><button id="ed-cancel">やめる</button></p>' +
-        '<p class="sub">変更は履歴に残り、Webのチケット詳細からいつでも巻き戻せます</p>' +
-        msgHtml();
-      document.getElementById("back").onclick = (e) => { e.preventDefault(); S.editing = false; render(); };
-      document.getElementById("ed-cancel").onclick = () => { S.editing = false; render(); };
+      app.innerHTML = viewWrap(
+        backLink("詳細へ戻る") +
+        '<h1 class="mt">#' + t.seq + " を編集</h1>" +
+        '<div class="mt"><input id="ed-title" value="' + esc(t.title) + '"></div>' +
+        '<div class="mt"><textarea id="ed-desc" placeholder="説明" style="min-height:96px">' + esc(t.description || "") + "</textarea></div>" +
+        '<p class="mt row"><button class="btn primary" id="ed-save">保存</button><button class="btn" id="ed-cancel">やめる</button></p>' +
+        '<p class="faint" style="font-size:10px">変更は履歴に残り、Webのチケット詳細からいつでも巻き戻せます</p>' +
+        msgHtml());
+      document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ editing: false }, "back"); };
+      document.getElementById("ed-cancel").onclick = () => go({ editing: false }, "back");
       document.getElementById("ed-save").onclick = async () => {
         const title = document.getElementById("ed-title").value.trim();
         const description = document.getElementById("ed-desc").value;
@@ -250,39 +389,46 @@
       };
       return;
     }
-    const selInfo = S.selection.length
-      ? "選択中: " + S.selection.map((n) => esc(n.name)).join(" / ")
-      : "作業対象のFrameをFigmaのキャンバスで選択してください（複数可）。チケットに紐づけておくと、レビューする人とClaudeが「どこを作業したか」を正確に特定でき、レビューと作業指示の精度が上がります。";
+    const selNames = S.selection.map((n) => esc(n.name)).join(" / ");
     const needKey = !S.fileKey;
-    app.innerHTML =
-      '<p><a href="#" id="back">← 一覧へ</a></p>' +
-      "<h1>#" + t.seq + " " + esc(t.title) + ' <a href="#" id="edit" title="タイトル・説明を編集" style="font-size:11px;font-weight:400">✏️ 編集</a></h1>' +
-      '<div class="row"><span class="chip">' + esc(t.column) + '</span><span class="chip' + (t.role === "レビュー" ? " rev" : "") + '">' + esc(t.role) + "</span></div>" +
-      (t.description ? '<p class="sub" style="white-space:pre-wrap;margin-top:6px">' + esc(t.description) + "</p>" : "") +
-      '<p class="mt row"><input id="addurl" placeholder="FigmaのURLを貼って紐づけ（コピペ用）" style="flex:1;min-width:120px;margin-top:0"><button id="addurlgo">追加</button></p>' +
-      (t.frames.length
-        ? '<p class="mt frames">紐づけ済み（クリックで移動）:<br>' +
-          t.frames.map((u, i) => '<a href="#" class="frame-link" data-url="' + esc(u) + '">🔗 Frame ' + (i + 1) + "</a>").join("<br>") +
-          "</p>"
-        : "") +
-      '<p class="mt sub">' + selInfo + "</p>" +
-      (needKey
-        ? '<p class="sub">初回だけ: このファイルのURL（ブラウザのアドレス欄からコピー）を貼ってください。選択したFrameへのリンクを作るために必要です。次からは聞かれません。</p>' +
-          '<input id="fileurl" placeholder="https://www.figma.com/design/…">' +
-          '<p class="mt"><button id="savekey">URLを追加</button></p>'
-        : '<p class="mt row"><button class="primary" id="attach"' + (S.selection.length ? "" : " disabled") + '>選択中のFrameを紐づける</button>' +
-          '<button id="capture"' + (S.selection.length ? "" : " disabled") + ' title="選択中のFrameのキャプチャを撮って、このチケットに貼ります">📸 キャプチャを撮る</button></p>' +
-          (S.capturing
-            ? '<p class="mt row"><input id="capname" placeholder="キャプチャの名前（任意・空ならFrame名）" style="flex:1;min-width:120px;margin-top:0">' +
-              '<button class="primary" id="capgo">撮る</button><button id="capcancel">やめる</button></p>'
-            : "")) +
-      '<p class="mt row"><span class="sub">状態:</span><select id="status">' +
+    app.innerHTML = viewWrap(
+      '<div class="row" style="justify-content:space-between">' + backLink() +
+      '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></div>" +
+      '<div class="row mt" style="gap:5px"><span class="chip seq">#' + t.seq + '</span>' +
+      '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +
+      // 状態セレクター（チップの並びに溶け込むリスト移動）
+      '<select id="status" style="width:auto;padding:2px 24px 2px 8px;font-size:11px;border-radius:99px;background-color:var(--surface2);border:none">' +
       S.data.columns.map((c) => '<option value="' + esc(c.name) + '"' + (c.name === t.column ? " selected" : "") + ">" + esc(c.name) + (c.role === "review" ? "（提出）" : "") + "</option>").join("") +
-      "</select></p>" +
-      msgHtml();
-    document.getElementById("back").onclick = (e) => { e.preventDefault(); S.open = null; render(); };
+      "</select></div>" +
+      '<h1 class="mt" style="margin-bottom:0">' + esc(t.title) + "</h1>" +
+      (t.description ? '<p class="sub" style="white-space:pre-wrap;margin:6px 0 0">' + esc(t.description) + "</p>" : "") +
+
+      '<div class="section"><h2>Figmaリンク</h2>' +
+      (t.frames.length
+        ? t.frames.map((u, i) => '<a href="#" class="framelink frame-link" data-url="' + esc(u) + '">' + I.link + " Frame " + (i + 1) + '<span class="faint" style="font-size:9px">（クリックで移動）</span></a>').join("")
+        : '<p class="faint" style="font-size:11px;margin:0">まだ紐づけがありません</p>') +
+      '<div class="row mt"><input id="addurl" placeholder="FigmaのURLを貼って紐づけ" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px"><button class="btn sm" id="addurlgo">追加</button></div>' +
+      "</div>" +
+
+      '<div class="section"><h2>選択中のFrame</h2>' +
+      (S.selection.length
+        ? '<p style="font-size:11px;margin:0 0 8px" class="sub">' + I.target + " " + selNames + "</p>"
+        : '<p class="faint" style="font-size:11px;margin:0 0 8px">作業対象のFrameをキャンバスで選択してください（複数可）。紐づけておくとレビュアーとClaudeが対象を正確に特定できます。</p>') +
+      (needKey
+        ? '<p class="faint" style="font-size:11px">初回だけ: このファイルのURL（ブラウザのアドレス欄からコピー）を貼ってください。選択Frameへのリンク作成に必要です。</p>' +
+          '<input id="fileurl" placeholder="https://www.figma.com/design/…" style="font-size:11px">' +
+          '<p class="mt"><button class="btn sm" id="savekey">URLを追加</button></p>'
+        : '<div class="row"><button class="btn primary sm" id="attach"' + (S.selection.length ? "" : " disabled") + '>' + I.link + "紐づける</button>" +
+          '<button class="btn sm" id="capture"' + (S.selection.length ? "" : " disabled") + ' title="選択中のFrameのキャプチャを撮って、このチケットに貼ります">' + I.camera + "キャプチャ</button></div>" +
+          (S.capturing
+            ? '<div class="row mt"><input id="capname" placeholder="キャプチャの名前（空ならFrame名）" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">' +
+              '<button class="btn primary sm" id="capgo">撮る</button><button class="btn sm" id="capcancel">やめる</button></div>'
+            : "")) +
+      "</div>" +
+      msgHtml());
+    document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ open: null }, "back"); };
     const ed = document.getElementById("edit");
-    if (ed) ed.onclick = (e) => { e.preventDefault(); S.editing = true; S.msg = null; render(); };
+    if (ed) ed.onclick = (e) => { e.preventDefault(); go({ editing: true, msg: null }, "fwd"); };
     const aug = document.getElementById("addurlgo");
     if (aug) aug.onclick = async () => {
       const url = (document.getElementById("addurl").value || "").trim();
@@ -355,4 +501,25 @@
     } catch (err) { S.msg = { t: "err", text: err.message }; }
     render();
   }
+
+  // ---- リサイズハンドル（右下ドラッグ→本体側でfigma.ui.resize+サイズ記憶） ----
+  (() => {
+    const rz = document.getElementById("resizer");
+    let start = null;
+    rz.addEventListener("pointerdown", (e) => {
+      start = { x: e.clientX, y: e.clientY, w: window.innerWidth, h: window.innerHeight };
+      rz.setPointerCapture(e.pointerId);
+    });
+    rz.addEventListener("pointermove", (e) => {
+      if (!start) return;
+      const w = Math.round(start.w + (e.clientX - start.x));
+      const h = Math.round(start.h + (e.clientY - start.y));
+      parent.postMessage({ pluginMessage: { type: "resize", width: w, height: h } }, "*");
+    });
+    rz.addEventListener("pointerup", (e) => {
+      start = null;
+      rz.releasePointerCapture(e.pointerId);
+      parent.postMessage({ pluginMessage: { type: "resize-save" } }, "*");
+    });
+  })();
 </script>

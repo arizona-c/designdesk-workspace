@@ -3,6 +3,16 @@
 
 figma.showUI(__html__, { width: 360, height: 560, themeColors: true });
 
+// 前回のUIサイズを復元（右下ハンドルでリサイズ可・2026-08-30）
+const UI_MIN_W = 320, UI_MIN_H = 400, UI_MAX_W = 720, UI_MAX_H = 1000;
+let uiSize = { width: 360, height: 560 };
+figma.clientStorage.getAsync("dd_uisize").then((saved) => {
+  if (saved && saved.width && saved.height) {
+    uiSize = saved;
+    figma.ui.resize(saved.width, saved.height);
+  }
+});
+
 async function sendSettings() {
   const token = await figma.clientStorage.getAsync("dd_token");
   const project = await figma.clientStorage.getAsync("dd_project");
@@ -44,6 +54,15 @@ figma.ui.onmessage = async (msg) => {
     await sendSettings();
   } else if (msg.type === "notify") {
     figma.notify(msg.message);
+  } else if (msg.type === "resize") {
+    // UIの右下ハンドルからのドラッグリサイズ（上下限つき）
+    uiSize = {
+      width: Math.max(UI_MIN_W, Math.min(UI_MAX_W, msg.width)),
+      height: Math.max(UI_MIN_H, Math.min(UI_MAX_H, msg.height)),
+    };
+    figma.ui.resize(uiSize.width, uiSize.height);
+  } else if (msg.type === "resize-save") {
+    await figma.clientStorage.setAsync("dd_uisize", uiSize);
   } else if (msg.type === "export-nodes") {
     // 指定ノードをPNG書き出しして返す（Before/Afterキャプチャ用）。
     // 消えたノードはスキップし、撮れたものだけ返す

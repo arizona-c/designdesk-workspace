@@ -152,7 +152,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list" };
+  let S = { token: null, project: null, fileKey: null, fileName: "", selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false };
   const API = "https://designdesk.arizona-c.com/api/plugin";
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
@@ -202,6 +202,7 @@
     } else if (m.type === "settings") {
       S.token = m.token; S.project = m.project; S.fileKey = m.fileKey; S.fileName = m.fileName;
       if (m.sort) S.sort = m.sort;
+      S.onlyDoing = !!m.onlyDoing;
       if (S.token && S.project) load(); else render();
     } else if (m.type === "selection") {
       S.selection = m.nodes; render();
@@ -323,17 +324,27 @@
       '<option value="list"' + (S.sort === "list" ? " selected" : "") + '>リスト順</option>' +
       '<option value="due"' + (S.sort === "due" ? " selected" : "") + '>期日が近い順</option>' +
       '<option value="id"' + (S.sort === "id" ? " selected" : "") + '>ID順</option>' +
-      '</select><span class="faint" style="font-size:10px">' + esc(d.user.name) + " さん</span></span></div>" +
+      '</select><label class="faint" style="font-size:10px;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="onlydoing" style="width:auto;margin:0;accent-color:var(--btn)"' + (S.onlyDoing ? " checked" : "") + '>作業中のみ</label></span></div>' +
       '<div class="row mt">' +
       '<button class="btn primary sm" id="newticket">' + I.plus + "チケット作成</button>" +
       (d.can_sync_ds ? '<button class="btn sm" id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">' + I.palette + "DS同期</button>" : "") +
       '<button class="btn sm" id="logout" style="margin-left:auto">接続をやり直す</button></div>' +
-      (d.tickets.length ? sortedTickets(d.tickets).map(ticketCard).join("") : '<div class="empty">進行中の担当チケットはありません</div>') +
+      (function () {
+        const list = S.onlyDoing ? d.tickets.filter((t) => t.columnRole === "doing") : d.tickets;
+        return list.length
+          ? sortedTickets(list).map(ticketCard).join("")
+          : '<div class="empty">' + (S.onlyDoing ? "作業中のチケットはありません" : "進行中の担当チケットはありません") + "</div>";
+      })() +
       msgHtml());
     app.querySelectorAll(".card").forEach((c) => (c.onclick = () => go({ open: Number(c.dataset.seq), msg: null }, "fwd")));
     document.getElementById("sort").onchange = (e) => {
       S.sort = e.target.value;
       parent.postMessage({ pluginMessage: { type: "save-sort", sort: S.sort } }, "*");
+      render();
+    };
+    document.getElementById("onlydoing").onchange = (e) => {
+      S.onlyDoing = e.target.checked;
+      parent.postMessage({ pluginMessage: { type: "save-only-doing", value: S.onlyDoing } }, "*");
       render();
     };
     document.getElementById("newticket").onclick = () => go({ creating: true, msg: null }, "fwd");

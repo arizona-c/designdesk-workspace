@@ -253,6 +253,14 @@
   }
 
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  // URLをリンク化してHTML化（エスケープ済み文字列を返す）
+  function linkify(s) {
+    return String(s).split(/(https?:\/\/[^\s<>"]+)/g).map((p) =>
+      /^https?:\/\//.test(p)
+        ? '<a href="' + esc(p) + '" target="_blank" style="word-break:break-all">' + esc(p) + "</a>"
+        : esc(p)
+    ).join("");
+  }
   function go(patch, dir) { Object.assign(S, patch); S.dir = dir || "fwd"; render(); }
 
   // ---- ヘッダー ----
@@ -444,7 +452,7 @@
       S.data.columns.map((c) => '<option value="' + esc(c.name) + '"' + (c.name === t.column ? " selected" : "") + ">" + esc(c.name) + (c.role === "review" ? "（提出）" : "") + "</option>").join("") +
       "</select></div>" +
       '<h1 class="mt" style="margin-bottom:0">' + esc(t.title) + "</h1>" +
-      (t.description ? '<p class="sub" style="white-space:pre-wrap;margin:6px 0 0">' + esc(t.description) + "</p>" : "") +
+      (t.description ? '<p class="sub" style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0">' + linkify(t.description) + "</p>" : "") +
 
       '<div class="section"><h2>Figmaリンク</h2>' +
       (t.frames.length

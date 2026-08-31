@@ -11,6 +11,9 @@ self_update() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   local before after
   before=$(git rev-parse HEAD 2>/dev/null)
+  # 誤って消されたプラグインファイルの自己修復（pullはローカル削除を復元しないため）。
+  # figma-plugin/ はユーザーが編集しない配布物なので、常にリポジトリの内容に戻して安全
+  git checkout -q -- figma-plugin 2>/dev/null || true
   if git pull --ff-only -q 2>/dev/null; then
     after=$(git rev-parse HEAD 2>/dev/null)
     if [ "$before" != "$after" ]; then

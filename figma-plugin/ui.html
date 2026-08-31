@@ -398,9 +398,10 @@
       if (!title) { S.msg = { t: "err", text: "タイトルを入れてください" }; render(); return; }
       const sel = S.selection.slice();
       const urls = S.fileKey ? sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-")) : [];
+      const names = sel.map((n) => n.name);
       try {
         S.msg = { t: "ok", text: "作成しています…" }; render();
-        const r = await api("POST", null, { action: "create", title, description, urls });
+        const r = await api("POST", null, { action: "create", title, description, urls, names });
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         await load();
         S.creating = false;
@@ -456,7 +457,7 @@
 
       '<div class="section"><h2>Figmaリンク</h2>' +
       (t.frames.length
-        ? t.frames.map((u, i) => '<a href="#" class="framelink frame-link" data-url="' + esc(u) + '">' + I.link + " Frame " + (i + 1) + '<span class="faint" style="font-size:9px">（クリックで移動）</span></a>').join("")
+        ? t.frames.map((u, i) => '<a href="#" class="framelink frame-link" data-url="' + esc(u) + '">' + I.link + " " + esc((t.frameNames && t.frameNames[u]) || "Frame " + (i + 1)) + '<span class="faint" style="font-size:9px">（クリックで移動）</span></a>').join("")
         : '<p class="faint" style="font-size:11px;margin:0">まだ紐づけがありません</p>') +
       '<div class="row mt"><input id="addurl" placeholder="FigmaのURLを貼って紐づけ" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px"><button class="btn sm" id="addurlgo">追加</button></div>' +
       "</div>" +
@@ -527,7 +528,8 @@
       try {
         const sel = S.selection.slice();
         const urls = sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
-        const r = await api("POST", null, { action: "attach_frames", seq: t.seq, urls });
+        const names = sel.map((n) => n.name);
+        const r = await api("POST", null, { action: "attach_frames", seq: t.seq, urls, names });
         S.msg = { t: "ok", text: r.message };
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         await load(); S.open = t.seq;

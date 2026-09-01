@@ -97,6 +97,25 @@ figma.ui.onmessage = async (msg) => {
       await figma.loadAllPagesAsync();
       const out = [];
       const usage = {}; // componentKey → { total, pages: { pageName: count } }（このファイル内のインスタンス使用数）
+      const varUsage = {}; // "コレクション名/変数名" → { total, pages }（デザインシステムの使用回数・DSページ用）
+      const varNameCache = {}; // variableId → "コレクション名/変数名"（解決は変数の種類数ぶんだけ）
+      async function varLabel(id) {
+        if (varNameCache[id] !== undefined) return varNameCache[id];
+        let label = null;
+        try {
+          const v = await figma.variables.getVariableByIdAsync(id);
+          if (v) {
+            let colName = "";
+            try {
+              const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+              colName = col ? col.name : "";
+            } catch (e) { colName = ""; }
+            label = (colName ? colName + "/" : "") + v.name;
+          }
+        } catch (e) { label = null; }
+        varNameCache[id] = label;
+        return label;
+      }
       const pages = figma.root.children;
       for (let pi = 0; pi < pages.length; pi++) {
         const page = pages[pi];
@@ -113,6 +132,23 @@ figma.ui.onmessage = async (msg) => {
           }
           out.push({ id: n.id, key: n.key || "", name: n.name, page: page.name, description: n.description || "", variants: variants, type: n.type });
         }
+        // 変数バインドの集計（DSページの使用回数用）。boundVariablesを持つノードだけ走査
+        const bounds = page.findAll((n) => n.boundVariables && Object.keys(n.boundVariables).length > 0);
+        for (const n of bounds) {
+          const bv = n.boundVariables;
+          for (const field in bv) {
+            const entry = bv[field];
+            const aliases = Array.isArray(entry) ? entry : [entry];
+            for (const al of aliases) {
+              if (!al || !al.id) continue;
+              const label = await varLabel(al.id);
+              if (!label) continue;
+              if (!varUsage[label]) varUsage[label] = { total: 0, pages: {} };
+              varUsage[label].total++;
+              varUsage[label].pages[page.name] = (varUsage[label].pages[page.name] || 0) + 1;
+            }
+          }
+        }
         // インスタンス集計（Variantは親セットのキーに寄せる — 一覧がセット単位のため）
         const insts = page.findAllWithCriteria({ types: ["INSTANCE"] });
         for (const inst of insts) {
@@ -127,7 +163,7 @@ figma.ui.onmessage = async (msg) => {
           usage[key].pages[page.name] = (usage[key].pages[page.name] || 0) + 1;
         }
       }
-      figma.ui.postMessage({ type: "components", ok: true, components: out, usage: usage });
+      figma.ui.postMessage({ type: "components", ok: true, components: out, usage: usage, varUsage: varUsage });
     } catch (e) {
       figma.ui.postMessage({ type: "components", ok: false, error: String(e) });
     }

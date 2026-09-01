@@ -208,7 +208,7 @@
       (async () => {
         try {
           S.msg = { t: "ok", text: "Design Deskへ送信中…（" + m.components.length + "件）" }; render();
-          const r = await api("POST", null, { action: "sync_components", components: m.components, usage: m.usage || {}, file_key: S.fileKey });
+          const r = await api("POST", null, { action: "sync_components", components: m.components, usage: m.usage || {}, var_usage: m.varUsage || {}, file_key: S.fileKey });
           S.msg = { t: "ok", text: r.message };
           if (S.compImages && m.components.length) {
             const ids = m.components.map((c) => c.id);

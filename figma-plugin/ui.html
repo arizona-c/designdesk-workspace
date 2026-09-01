@@ -375,7 +375,7 @@
       '</select><label class="faint" style="font-size:10px;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="onlydoing" style="width:auto;margin:0;accent-color:var(--btn)"' + (S.onlyDoing ? " checked" : "") + '>作業中のみ</label></span></div>' +
       '<div class="row mt">' +
       '<button class="btn primary sm" id="newticket">' + I.plus + "チケット作成</button>" +
-      (d.can_sync_ds ? '<button class="btn sm" id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">' + I.palette + "DS同期</button>" : "") +
+      (d.can_sync_ds ? '<button class="btn sm" id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">' + I.palette + "デザインシステム同期</button>" : "") +
       (d.can_sync_ds ? '<button class="btn sm" id="synccomp" title="このファイルの全コンポーネントの一覧をDesign Deskへ同期します（ディレクター専用・正本はFigmaのまま）">' + I.grid + "部品同期</button>" + '<label class="faint" style="font-size:10px;display:inline-flex;align-items:center;gap:3px;cursor:pointer" title="ONにするとサムネ画像も書き出してDesign Deskに保存します（目安: 1件あたり約5秒。100件なら8分前後）"><input type="checkbox" id="compimgs" style="width:auto;margin:0;accent-color:var(--btn)"' + (S.compImages ? " checked" : "") + '>画像も</label>' : "") +
       '<button class="btn sm" id="logout" style="margin-left:auto">接続をやり直す</button></div>' +
       (function () {

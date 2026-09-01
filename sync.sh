@@ -36,7 +36,9 @@ sync_designdesk() {
     "$DESIGNDESK_URL/api/sync/claude-md?project=$DESIGNDESK_PROJECT" \
     -o .claude/designdesk-rules.md.tmp; then
     mv .claude/designdesk-rules.md.tmp .claude/designdesk-rules.md
-    echo "✅ Design Desk のルールを同期しました（$(head -1 .claude/designdesk-rules.md | sed 's/# //')）"
+    # この同期成功の瞬間、Design Desk側のサイドバーの連携チップも🟢になる（last_used_at更新）
+    echo "🔗 Design Desk と連携しました（プロジェクト: $DESIGNDESK_PROJECT）— Web側サイドバーにも「Claude連携中」が点灯します"
+    echo "✅ 最新ルールを同期しました（$(head -1 .claude/designdesk-rules.md | sed 's/# //')）"
     # 起動サマリ: 自分の進行中チケットとAIレビュー待機（ヘッダーから取得）
     local my pend
     my=$(grep -i '^x-dd-my-tickets:' "$hdrs" | tr -dc '0-9')

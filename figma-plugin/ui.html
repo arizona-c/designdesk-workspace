@@ -200,12 +200,15 @@
         } catch (err) { S.msg = { t: "err", text: err.message }; }
         render();
       })();
+    } else if (m.type === "components-progress") {
+      S.msg = { t: "ok", text: "読み取り中… " + (m.done + 1) + "/" + m.total + "ページ（" + m.page + "）" }; render();
+      return;
     } else if (m.type === "components") {
       if (!m.ok) { S.msg = { t: "err", text: "読み取りに失敗: " + m.error }; render(); return; }
       (async () => {
         try {
           S.msg = { t: "ok", text: "Design Deskへ送信中…（" + m.components.length + "件）" }; render();
-          const r = await api("POST", null, { action: "sync_components", components: m.components, file_key: S.fileKey });
+          const r = await api("POST", null, { action: "sync_components", components: m.components, usage: m.usage || {}, file_key: S.fileKey });
           S.msg = { t: "ok", text: r.message };
           parent.postMessage({ pluginMessage: { type: "notify", message: "コンポーネント一覧を同期しました" } }, "*");
         } catch (err) { S.msg = { t: "err", text: err.message }; }

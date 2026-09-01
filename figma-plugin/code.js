@@ -95,7 +95,11 @@ figma.ui.onmessage = async (msg) => {
     try {
       await figma.loadAllPagesAsync();
       const out = [];
-      for (const page of figma.root.children) {
+      const usage = {}; // componentKey → { total, pages: { pageName: count } }（このファイル内のインスタンス使用数）
+      const pages = figma.root.children;
+      for (let pi = 0; pi < pages.length; pi++) {
+        const page = pages[pi];
+        figma.ui.postMessage({ type: "components-progress", done: pi, total: pages.length, page: page.name });
         const nodes = page.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] });
         for (const n of nodes) {
           if (n.type === "COMPONENT" && n.parent && n.parent.type === "COMPONENT_SET") continue;
@@ -106,10 +110,23 @@ figma.ui.onmessage = async (msg) => {
               variants = Object.keys(props).map((k) => k + "=" + props[k].values.join("|")).join(" / ");
             } catch (e) { variants = ""; }
           }
-          out.push({ id: n.id, name: n.name, page: page.name, description: n.description || "", variants: variants, type: n.type });
+          out.push({ id: n.id, key: n.key || "", name: n.name, page: page.name, description: n.description || "", variants: variants, type: n.type });
+        }
+        // インスタンス集計（Variantは親セットのキーに寄せる — 一覧がセット単位のため）
+        const insts = page.findAllWithCriteria({ types: ["INSTANCE"] });
+        for (const inst of insts) {
+          let mc = null;
+          try { mc = await inst.getMainComponentAsync(); } catch (e) { mc = null; }
+          if (!mc) continue;
+          const owner = mc.parent && mc.parent.type === "COMPONENT_SET" ? mc.parent : mc;
+          const key = owner.key || "";
+          if (!key) continue;
+          if (!usage[key]) usage[key] = { total: 0, pages: {} };
+          usage[key].total++;
+          usage[key].pages[page.name] = (usage[key].pages[page.name] || 0) + 1;
         }
       }
-      figma.ui.postMessage({ type: "components", ok: true, components: out });
+      figma.ui.postMessage({ type: "components", ok: true, components: out, usage: usage });
     } catch (e) {
       figma.ui.postMessage({ type: "components", ok: false, error: String(e) });
     }

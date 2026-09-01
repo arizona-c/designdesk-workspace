@@ -375,16 +375,23 @@
       '</select><label class="faint" style="font-size:10px;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="onlydoing" style="width:auto;margin:0;accent-color:var(--btn)"' + (S.onlyDoing ? " checked" : "") + '>作業中のみ</label></span></div>' +
       '<div class="row mt">' +
       '<button class="btn primary sm" id="newticket">' + I.plus + "チケット作成</button>" +
-      '<button class="btn sm" id="connbtn" style="margin-left:auto" title="Design Deskへの接続（アクセスキー・プロジェクト）を設定し直します">接続設定</button></div>' +
-      (d.can_sync_ds ? '<div class="row" style="gap:5px;margin-top:6px;align-items:center">' +
-        '<span class="faint" style="font-size:10px">Design Deskへ同期:</span>' +
-        '<button class="btn sm' + (S.syncPanel === "ds" ? " primary" : "") + '" id="syncds">' + I.palette + "デザインシステム同期</button>" +
-        '<button class="btn sm' + (S.syncPanel === "comp" ? " primary" : "") + '" id="synccomp">' + I.grid + "コンポーネント同期</button></div>" : "") +
+      '<button class="btn sm' + (S.syncPanel ? " primary" : "") + '" id="settingsbtn" style="margin-left:auto">設定</button></div>' +
       (S.syncPanel ? '<div class="mt" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface2)">' + (function () {
+        if (S.syncPanel === "menu") {
+          const item = (id, icon, title, desc) =>
+            '<button class="btn" id="' + id + '" style="display:flex;width:100%;text-align:left;align-items:flex-start;gap:6px;margin-top:6px;padding:8px 10px"><span style="margin-top:2px">' + icon + '</span><span><b style="font-size:12px">' + title + '</b><br><span class="faint" style="font-size:10px;line-height:1.5">' + desc + "</span></span></button>";
+          return '<p style="margin:0;font-weight:bold;font-size:12px">設定</p>' +
+            (d.can_sync_ds
+              ? item("syncds", I.palette, "デザインシステム同期", "このファイルのCollection（色・余白などの変数）をDesign Deskへ取り込みます（ディレクター用）") +
+                item("synccomp", I.grid, "コンポーネント同期", "このファイルのコンポーネント一覧と使用回数をDesign Deskへ載せます（ディレクター用）")
+              : "") +
+            item("connbtn", I.link, "接続設定", "Design Deskとの接続（アクセスキー・プロジェクト）を設定し直します") +
+            '<a href="#" id="askcancel" class="faint" style="font-size:10px;display:inline-block;margin-top:8px">閉じる</a>';
+        }
         if (S.syncPanel === "conn") {
           return '<p style="margin:0;font-weight:bold;font-size:12px">接続設定をやり直す</p>' +
             '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">Design Deskとの接続に使う「アクセスキー」と「プロジェクト」を入れ直す画面に戻ります。接続がうまくいかないときや、別のプロジェクトに切り替えたいときに使ってください。</p>' +
-            '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="connconfirm">設定画面へ</button><button class="btn sm" id="askcancel">やめる</button></div>';
+            '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="connconfirm">設定画面へ</button><button class="btn sm" id="askback">戻る</button></div>';
         }
         const isDs = S.syncPanel === "ds";
         let h = '<p style="margin:0;font-weight:bold;font-size:12px">' + (isDs ? "デザインシステム同期" : "コンポーネント同期") + "</p>" +
@@ -399,7 +406,7 @@
         if (!isDs) {
           h += '<label class="faint" style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;margin-top:8px"><input type="checkbox" id="compimgs" style="width:auto;margin:0;accent-color:var(--btn)"' + (S.compImages ? " checked" : "") + '>サムネ画像もDesign Deskに送る（1件あたり約5秒かかります。あとから追加でもOK）</label>';
         }
-        h += '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="runsync">同期を実行</button><button class="btn sm" id="askcancel">やめる</button></div>';
+        h += '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="runsync">同期を実行</button><button class="btn sm" id="askback">戻る</button></div>';
         return h;
       })() + "</div>" : "") +
       (function () {
@@ -430,12 +437,16 @@
         parent.postMessage({ pluginMessage: { type: "read-components" } }, "*");
       }
     };
-    // 同期ボタンは押した直後に実行せず、説明パネルを展開してから「同期を実行」で走らせる（段階的開示）
+    // 「設定」→メニュー→各説明パネル→実行、の段階的開示。普段の画面はチケットだけに保つ
+    document.getElementById("settingsbtn").onclick = () => { S.syncPanel = S.syncPanel ? null : "menu"; S.msg = null; render(); };
     const sds = document.getElementById("syncds");
-    if (sds) sds.onclick = () => { S.syncPanel = S.syncPanel === "ds" ? null : "ds"; S.msg = null; render(); };
+    if (sds) sds.onclick = () => { S.syncPanel = "ds"; S.msg = null; render(); };
     const scp = document.getElementById("synccomp");
-    if (scp) scp.onclick = () => { S.syncPanel = S.syncPanel === "comp" ? null : "comp"; S.msg = null; render(); };
-    document.getElementById("connbtn").onclick = () => { S.syncPanel = S.syncPanel === "conn" ? null : "conn"; S.msg = null; render(); };
+    if (scp) scp.onclick = () => { S.syncPanel = "comp"; S.msg = null; render(); };
+    const cb = document.getElementById("connbtn");
+    if (cb) cb.onclick = () => { S.syncPanel = "conn"; S.msg = null; render(); };
+    const ab = document.getElementById("askback");
+    if (ab) ab.onclick = () => { S.syncPanel = "menu"; render(); };
     const cc = document.getElementById("connconfirm");
     if (cc) cc.onclick = () => { S.syncPanel = null; S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };
     const cimg = document.getElementById("compimgs");

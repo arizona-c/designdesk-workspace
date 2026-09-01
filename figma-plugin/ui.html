@@ -193,7 +193,7 @@
       (async () => {
         try {
           S.msg = { t: "ok", text: "Design Deskへ送信中…" }; render();
-          const r = await api("POST", null, { action: "sync_design_system", collections: m.collections, textStyles: m.textStyles });
+          const r = await api("POST", null, { action: "sync_design_system", collections: m.collections, textStyles: m.textStyles, file_key: S.fileKey });
           S.msg = { t: "ok", text: r.message };
           parent.postMessage({ pluginMessage: { type: "notify", message: "デザインシステムを同期しました" } }, "*");
         } catch (err) { S.msg = { t: "err", text: err.message }; }

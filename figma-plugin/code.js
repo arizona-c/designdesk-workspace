@@ -81,7 +81,8 @@ figma.ui.onmessage = async (msg) => {
         if (!node || !("exportAsync" in node)) continue;
         const bytes = await node.exportAsync({
           format: "PNG",
-          constraint: { type: "SCALE", value: 1 },
+          // width指定あり=サムネ用の縮小書き出し（コンポーネント一覧）。なし=等倍（キャプチャ用）
+          constraint: msg.width ? { type: "WIDTH", value: msg.width } : { type: "SCALE", value: 1 },
         });
         images.push({ id, name: node.name, data: figma.base64Encode(bytes) });
       } catch (e) {

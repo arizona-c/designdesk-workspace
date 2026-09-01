@@ -89,6 +89,30 @@ figma.ui.onmessage = async (msg) => {
       }
     }
     figma.ui.postMessage({ type: "exported", requestId: msg.requestId, images });
+  } else if (msg.type === "read-components") {
+    // 全ページのコンポーネント/コンポーネントセットを列挙（Variantはセットにまとめる）。
+    // 正本はFigma側 — これはDesign Deskの「開かずに眺める索引」用スナップショット
+    try {
+      await figma.loadAllPagesAsync();
+      const out = [];
+      for (const page of figma.root.children) {
+        const nodes = page.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] });
+        for (const n of nodes) {
+          if (n.type === "COMPONENT" && n.parent && n.parent.type === "COMPONENT_SET") continue;
+          let variants = "";
+          if (n.type === "COMPONENT_SET") {
+            try {
+              const props = n.variantGroupProperties || {};
+              variants = Object.keys(props).map((k) => k + "=" + props[k].values.join("|")).join(" / ");
+            } catch (e) { variants = ""; }
+          }
+          out.push({ id: n.id, name: n.name, page: page.name, description: n.description || "", variants: variants, type: n.type });
+        }
+      }
+      figma.ui.postMessage({ type: "components", ok: true, components: out });
+    } catch (e) {
+      figma.ui.postMessage({ type: "components", ok: false, error: String(e) });
+    }
   } else if (msg.type === "read-design-system") {
     // このファイルのVariable Collectionsとテキストスタイルを読み取ってUIへ返す。
     // REST変数APIはEnterprise限定だが、プラグインAPIはプラン不問で読める

@@ -159,6 +159,7 @@
 
   // ---- アイコン（UIコントロールに絵文字を使わない・アプリと同方針） ----
   const I = {
+    grid: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
     plus: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
     camera: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>',
     palette: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
@@ -196,6 +197,17 @@
           const r = await api("POST", null, { action: "sync_design_system", collections: m.collections, textStyles: m.textStyles, file_key: S.fileKey });
           S.msg = { t: "ok", text: r.message };
           parent.postMessage({ pluginMessage: { type: "notify", message: "デザインシステムを同期しました" } }, "*");
+        } catch (err) { S.msg = { t: "err", text: err.message }; }
+        render();
+      })();
+    } else if (m.type === "components") {
+      if (!m.ok) { S.msg = { t: "err", text: "読み取りに失敗: " + m.error }; render(); return; }
+      (async () => {
+        try {
+          S.msg = { t: "ok", text: "Design Deskへ送信中…（" + m.components.length + "件）" }; render();
+          const r = await api("POST", null, { action: "sync_components", components: m.components, file_key: S.fileKey });
+          S.msg = { t: "ok", text: r.message };
+          parent.postMessage({ pluginMessage: { type: "notify", message: "コンポーネント一覧を同期しました" } }, "*");
         } catch (err) { S.msg = { t: "err", text: err.message }; }
         render();
       })();
@@ -346,6 +358,7 @@
       '<div class="row mt">' +
       '<button class="btn primary sm" id="newticket">' + I.plus + "チケット作成</button>" +
       (d.can_sync_ds ? '<button class="btn sm" id="syncds" title="このファイルのVariable CollectionsとテキストスタイルをDesign Deskのデザインシステム正本へ取り込みます（ディレクター専用）">' + I.palette + "DS同期</button>" : "") +
+      (d.can_sync_ds ? '<button class="btn sm" id="synccomp" title="このファイルの全コンポーネントの一覧をDesign Deskへ同期します（ディレクター専用・正本はFigmaのまま）">' + I.grid + "部品同期</button>" : "") +
       '<button class="btn sm" id="logout" style="margin-left:auto">接続をやり直す</button></div>' +
       (function () {
         const list = S.onlyDoing ? d.tickets.filter((t) => t.columnRole === "doing") : d.tickets;
@@ -370,6 +383,11 @@
     if (sds) sds.onclick = () => {
       S.msg = { t: "ok", text: "このファイルのCollectionsを読み取っています…" }; render();
       parent.postMessage({ pluginMessage: { type: "read-design-system" } }, "*");
+    };
+    const scp = document.getElementById("synccomp");
+    if (scp) scp.onclick = () => {
+      S.msg = { t: "ok", text: "全ページのコンポーネントを読み取っています…（大きいファイルは少し待ちます）" }; render();
+      parent.postMessage({ pluginMessage: { type: "read-components" } }, "*");
     };
     document.getElementById("logout").onclick = () => { S.data = null; parent.postMessage({ pluginMessage: { type: "logout" } }, "*"); };
   }

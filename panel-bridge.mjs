@@ -205,6 +205,7 @@ function sendUser(text) {
   busy = true;
   emit({ type: "user", text });
   emit(state(), false);
+  console.log(`[${stamp()}] 送信: ${text.slice(0, 60).replace(/\n/g, " ")}`);
   toChild({ type: "user", message: { role: "user", content: text } });
 }
 
@@ -252,8 +253,15 @@ function authed(req, url) {
   return t === token;
 }
 
+function stamp() {
+  return new Date().toLocaleTimeString("ja-JP", { hour12: false });
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://127.0.0.1");
+  if (req.method !== "OPTIONS") {
+    res.on("finish", () => console.log(`[${stamp()}] ${req.method} ${url.pathname} → ${res.statusCode}`));
+  }
   if (!cors(req, res)) {
     // ブラウザ以外（curl等の直接アクセス）や許可外オリジンは拒否
     return json(res, 403, { error: "forbidden origin" });
@@ -282,10 +290,12 @@ const server = createServer(async (req, res) => {
     });
     res.write(`data: ${JSON.stringify({ type: "hello", history, state: state(), pending: [...pending.entries()].map(([id, p]) => ({ requestId: id, toolName: p.toolName, summary: summarizeTool(p.toolName, p.input) })) })}\n\n`);
     clients.add(res);
+    console.log(`[${stamp()}] パネル接続（受信開始）`);
     const ping = setInterval(() => res.write(": ping\n\n"), 20000);
     req.on("close", () => {
       clearInterval(ping);
       clients.delete(res);
+      console.log(`[${stamp()}] パネル切断`);
     });
     return;
   }

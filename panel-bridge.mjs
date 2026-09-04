@@ -200,13 +200,15 @@ function respondPermission(requestId, behavior, input) {
   toChild({ type: "control_response", response: { subtype: "success", request_id: requestId, response } });
 }
 
-function sendUser(text) {
+// context: パネルが添える「いま開いている画面」の情報（{ label, prompt }）。表示には label だけ、Claude には prompt を前置きする
+function sendUser(text, context) {
   ensureChild();
   busy = true;
-  emit({ type: "user", text });
+  emit({ type: "user", text, contextLabel: context?.label ?? null });
   emit(state(), false);
-  console.log(`[${stamp()}] 送信: ${text.slice(0, 60).replace(/\n/g, " ")}`);
-  toChild({ type: "user", message: { role: "user", content: text } });
+  console.log(`[${stamp()}] 送信${context?.label ? `（${context.label}）` : ""}: ${text.slice(0, 60).replace(/\n/g, " ")}`);
+  const content = context?.prompt ? `${context.prompt}\n\n${text}` : text;
+  toChild({ type: "user", message: { role: "user", content } });
 }
 
 function interrupt() {
@@ -271,7 +273,7 @@ const server = createServer(async (req, res) => {
     return res.end();
   }
   if (req.method === "GET" && url.pathname === "/status") {
-    return json(res, 200, { ok: true, project: PROJECT, paired: authed(req, url), version: 1 });
+    return json(res, 200, { ok: true, project: PROJECT, paired: authed(req, url), version: 2 });
   }
   if (req.method === "POST" && url.pathname === "/pair") {
     const { code } = await readBody(req);
@@ -300,11 +302,15 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (req.method === "POST" && url.pathname === "/send") {
-    const { text } = await readBody(req);
+    const { text, context } = await readBody(req);
     const t = String(text ?? "").trim();
     if (!t) return json(res, 400, { error: "empty" });
     if (busy) return json(res, 409, { error: "Claude が応答中です。完了か中断を待ってください" });
-    sendUser(t);
+    const ctx =
+      context && typeof context === "object" && typeof context.prompt === "string"
+        ? { label: String(context.label ?? "").slice(0, 80), prompt: String(context.prompt).slice(0, 1000) }
+        : null;
+    sendUser(t, ctx);
     return json(res, 202, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/permission") {

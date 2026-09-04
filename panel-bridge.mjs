@@ -253,19 +253,14 @@ function sendUser(text, context) {
   toChild({ type: "user", message: { role: "user", content } });
 }
 
-// 接続時の自動メッセージ（利用者の発言としては表示しない）
+// 接続時の自動メッセージ。利用者の発言として吹き出しに出す（普通のチャットの第一声と同じ見え方にする・オーナー意向）。
+// Claude 向けの細かな指示は context.prompt に入れて画面には出さない
 function kickoff() {
-  ensureChild();
-  busy = true;
-  emit(state(), false);
-  console.log(`[${stamp()}] 起動の合図を送信（接続時の自動メッセージ）`);
-  toChild({
-    type: "user",
-    message: {
-      role: "user",
-      content:
-        "（Design Desk のブラウザパネルから接続しました。これは接続時の自動メッセージです）この起動では SessionStart フックで bash sync.sh が既に実行済みなので、同期は再実行せず、.claude/designdesk-rules.md を読んで案件名・ルール版・進行中チケット数・AIレビュー待ちの有無を2〜3行で報告してください。長い説明や機能一覧は不要です。",
-    },
+  console.log(`[${stamp()}] 接続時の自動メッセージを送信`);
+  sendUser("Design Desk と接続しました。準備ができているか教えてください。", {
+    label: "自動送信（接続時）",
+    prompt:
+      "（このメッセージは Design Desk のブラウザパネルが接続時に自動送信したものです。この起動では SessionStart フックで bash sync.sh が既に実行済みなので同期は再実行せず、.claude/designdesk-rules.md を読んで、案件名・ルール版・進行中チケット数・AIレビュー待ちの有無を2〜3行で報告してください。長い説明や機能一覧は不要です）",
   });
 }
 
@@ -344,7 +339,6 @@ const server = createServer(async (req, res) => {
     if (first) {
       setTimeout(() => {
         if (busy || child) return;
-        emit({ type: "status", message: "接続しました。手元のClaudeを起動して準備を確認しています…" });
         kickoff();
       }, 300);
     }

@@ -253,6 +253,22 @@ function sendUser(text, context) {
   toChild({ type: "user", message: { role: "user", content } });
 }
 
+// 接続時の自動メッセージ（利用者の発言としては表示しない）
+function kickoff() {
+  ensureChild();
+  busy = true;
+  emit(state(), false);
+  console.log(`[${stamp()}] 起動の合図を送信（接続時の自動メッセージ）`);
+  toChild({
+    type: "user",
+    message: {
+      role: "user",
+      content:
+        "（Design Desk のブラウザパネルから接続しました。これは接続時の自動メッセージです）起動時に行う手順（同期など）を済ませ、案件名・ルール版・進行中チケット数・AIレビュー待ちの有無を2〜3行で報告してください。長い説明や機能一覧は不要です。",
+    },
+  });
+}
+
 function interrupt() {
   if (!child) return;
   toChild({ type: "control_request", request_id: randomUUID(), request: { subtype: "interrupt" } });
@@ -320,8 +336,18 @@ const server = createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/pair") {
     const { code } = await readBody(req);
     if (String(code) !== pairCode) return json(res, 401, { error: "接続コードが違います" });
+    const first = !token && !child && history.length === 0;
     token = randomBytes(24).toString("hex");
     console.log(`✅ ブラウザと接続しました（${req.headers.origin}）`);
+    // 初回接続時だけ、Claude を起動して起動手順（同期・AIレビュー待ちの案内）を先に済ませておく。
+    // パネルには状態の1行だけ出し、この合図は利用者の発言としては表示しない
+    if (first) {
+      setTimeout(() => {
+        if (busy || child) return;
+        emit({ type: "status", message: "接続しました。手元のClaudeを起動して準備を確認しています…" });
+        kickoff();
+      }, 300);
+    }
     return json(res, 200, { token, project: PROJECT });
   }
   if (!authed(req, url)) return json(res, 401, { error: "未接続です。接続コードを入力してください" });

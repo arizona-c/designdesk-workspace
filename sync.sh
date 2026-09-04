@@ -27,6 +27,7 @@ template_update() {
     local before after
     before=$(cat CLAUDE.md sync.sh .claude/settings.json 2>/dev/null | cksum)
     cp -R "$tmpdir"/. .
+    chmod +x ./*.command 2>/dev/null || true # zip経由だと実行権限が落ちるため（ダブルクリック起動用）
     after=$(cat CLAUDE.md sync.sh .claude/settings.json 2>/dev/null | cksum)
     touch "$stamp"
     if [ "$before" != "$after" ]; then

@@ -47,24 +47,28 @@ if (env.DESIGNDESK_URL) {
 // 1) PATH の claude（CLI版をインストールしている人）
 // 2) Claudeデスクトップアプリが自前で持つ本体（Mac: ~/Library/Application Support/Claude/claude-code/<版>/claude.app/Contents/MacOS/claude）
 //    → CLI版を入れていないデスクトップアプリ利用者でも、この橋渡しは使える
+function findDesktopClaude() {
+  if (process.platform !== "darwin") return null;
+  const base = join(homedir(), "Library", "Application Support", "Claude", "claude-code");
+  try {
+    const versions = readdirSync(base)
+      .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    for (const v of versions) {
+      const bin = join(base, v, "claude.app", "Contents", "MacOS", "claude");
+      if (existsSync(bin)) return { bin, from: `デスクトップアプリ同梱（${v}）` };
+    }
+  } catch {}
+  return null;
+}
 function findClaude() {
+  // DESIGNDESK_CLAUDE=app で、CLI版が入っていてもデスクトップアプリ同梱の本体を使う（CLI無し環境の検証用）
+  if (process.env.DESIGNDESK_CLAUDE === "app") return findDesktopClaude();
   try {
     const p = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" }).split(/\r?\n/)[0].trim();
     if (p) return { bin: p, from: "CLI版（PATH）" };
   } catch {}
-  if (process.platform === "darwin") {
-    const base = join(homedir(), "Library", "Application Support", "Claude", "claude-code");
-    try {
-      const versions = readdirSync(base)
-        .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
-        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-      for (const v of versions) {
-        const bin = join(base, v, "claude.app", "Contents", "MacOS", "claude");
-        if (existsSync(bin)) return { bin, from: `デスクトップアプリ同梱（${v}）` };
-      }
-    } catch {}
-  }
-  return null;
+  return findDesktopClaude();
 }
 const CLAUDE = findClaude();
 if (!CLAUDE) {

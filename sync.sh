@@ -1,14 +1,45 @@
 #!/bin/bash
-# Design Desk 同期スクリプト。Claude 起動時に自動実行される（.claude/settings.json の SessionStart フック）。手動実行もOK
+# Design Desk 同期スクリプト。Claude 起動時に自動実行される（.claude/settings.json の SessionStart フック。
+# Claudeデスクトップアプリではフックが動かないため、CLAUDE.md の指示でClaudeが最初に実行する）。手動実行もOK
 # やること:
-#   1. workspace自体の自動更新（git pull。Figmaプラグインの新版もこれで手元に届く）
+#   1. workspace自体の自動更新（gitで取得したフォルダは git pull／zipで配られたフォルダは Design Desk から雛形を取得して上書き。
+#      Figmaプラグインの新版もこれで手元に届く）
 #   2. Design Desk から最新ルールを取得して .claude/designdesk-rules.md を更新
-#   3. チケット操作ツール（MCP）の接続設定 .mcp.json を生成
-# 実行中に git pull で自分自身が書き換わると誤動作するため、全体を関数にして末尾のブロックでまとめて実行する
+#   3. チケット操作ツール（MCP）とFigma接続の設定 .mcp.json を生成
+# 実行中に自分自身が書き換わると誤動作するため、全体を関数にして末尾のブロックでまとめて実行する
 cd "$(dirname "$0")"
 
+# zip配布（git無し）のフォルダ向け: Design Desk から雛形zipを取得して雛形管理のファイルだけ上書きする。
+# 個人ファイル（.env / CLAUDE.local.md / local/ / 同期生成物）は雛形に含まれないので触られない。6時間に1回まで
+template_update() {
+  set -a; [ -f .env ] && . ./.env; set +a
+  [ -n "${DESIGNDESK_TOKEN:-}" ] && [ -n "${DESIGNDESK_URL:-}" ] && [ -n "${DESIGNDESK_PROJECT:-}" ] || return 0
+  command -v unzip >/dev/null 2>&1 || return 0
+  mkdir -p .claude
+  local stamp=".claude/.template-synced"
+  if [ -f "$stamp" ] && [ -n "$(find "$stamp" -mmin -360 2>/dev/null)" ]; then return 0; fi
+  local tmpzip tmpdir
+  tmpzip=$(mktemp -t dd-template.XXXXXX) || return 0
+  tmpdir=$(mktemp -d -t dd-template.XXXXXX) || { rm -f "$tmpzip"; return 0; }
+  if curl -fsS -m 20 -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
+      "$DESIGNDESK_URL/api/sync/workspace?project=$DESIGNDESK_PROJECT" -o "$tmpzip" \
+     && unzip -o -q "$tmpzip" -d "$tmpdir"; then
+    local before after
+    before=$(cat CLAUDE.md sync.sh .claude/settings.json 2>/dev/null | cksum)
+    cp -R "$tmpdir"/. .
+    after=$(cat CLAUDE.md sync.sh .claude/settings.json 2>/dev/null | cksum)
+    touch "$stamp"
+    if [ "$before" != "$after" ]; then
+      echo "⬆️ 作業フォルダの雛形を更新しました（Figmaプラグインの更新が含まれる場合、プラグインは次回起動から最新になります）"
+    fi
+  else
+    echo "⚠ 作業フォルダの自動更新に失敗（オフライン?）。今の版のまま続行します"
+  fi
+  rm -rf "$tmpzip" "$tmpdir"
+}
+
 self_update() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then template_update; return 0; fi
   local before after
   before=$(git rev-parse HEAD 2>/dev/null)
   # 誤って消されたプラグインファイルの自己修復（pullはローカル削除を復元しないため）。
@@ -58,6 +89,8 @@ sync_designdesk() {
   # Design Desk のチケット操作ツール（MCP）の接続設定を生成する。
   # トークンを含むためコミットされない（.gitignore済み）。初回生成時は次回の起動から有効
   local FIRST_MCP=0; [ -f .mcp.json ] || FIRST_MCP=1
+  # figma: 公式のリモートMCP（初回利用時にブラウザでFigmaへのログイン許可が出る）。
+  # CLIで公式プラグインを入れている人は同じ接続先なので二重にならない
   cat > .mcp.json <<MCPEOF
 {
   "mcpServers": {
@@ -65,12 +98,16 @@ sync_designdesk() {
       "type": "http",
       "url": "$DESIGNDESK_URL/api/mcp?project=$DESIGNDESK_PROJECT",
       "headers": { "Authorization": "Bearer $DESIGNDESK_TOKEN" }
+    },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
     }
   }
 }
 MCPEOF
   if [ "$FIRST_MCP" = "1" ]; then
-    echo "🔌 Design Desk のチケット操作（MCP）を設定しました。次回の起動から使えます"
+    echo "🔌 Design Desk のチケット操作（MCP）とFigma接続を設定しました。次回の起動から使えます（Figmaは初回にブラウザで許可を求められます）"
   fi
 }
 

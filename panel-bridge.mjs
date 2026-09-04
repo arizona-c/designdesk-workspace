@@ -16,8 +16,10 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
+import { homedir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -39,6 +41,35 @@ if (env.DESIGNDESK_URL) {
   try {
     allowedOrigins.add(new URL(env.DESIGNDESK_URL).origin);
   } catch {}
+}
+
+// ---- Claude Code 本体の場所 ----
+// 1) PATH の claude（CLI版をインストールしている人）
+// 2) Claudeデスクトップアプリが自前で持つ本体（Mac: ~/Library/Application Support/Claude/claude-code/<版>/claude.app/Contents/MacOS/claude）
+//    → CLI版を入れていないデスクトップアプリ利用者でも、この橋渡しは使える
+function findClaude() {
+  try {
+    const p = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" }).split(/\r?\n/)[0].trim();
+    if (p) return { bin: p, from: "CLI版（PATH）" };
+  } catch {}
+  if (process.platform === "darwin") {
+    const base = join(homedir(), "Library", "Application Support", "Claude", "claude-code");
+    try {
+      const versions = readdirSync(base)
+        .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+      for (const v of versions) {
+        const bin = join(base, v, "claude.app", "Contents", "MacOS", "claude");
+        if (existsSync(bin)) return { bin, from: `デスクトップアプリ同梱（${v}）` };
+      }
+    } catch {}
+  }
+  return null;
+}
+const CLAUDE = findClaude();
+if (!CLAUDE) {
+  console.error("Claude Code が見つかりません。Claude Code CLI をインストールするか、Claudeデスクトップアプリで一度 Code を開いてください");
+  process.exit(1);
 }
 
 // ---- 状態 ----
@@ -77,9 +108,10 @@ function ensureChild() {
     "--permission-mode", "default",
   ];
   if (sessionId) args.push("--resume", sessionId);
-  const p = spawn("claude", args, { cwd: ROOT, stdio: ["pipe", "pipe", "pipe"], env: process.env });
+  const p = spawn(CLAUDE.bin, args, { cwd: ROOT, stdio: ["pipe", "pipe", "pipe"], env: process.env, shell: process.platform === "win32" });
   child = p;
   let buf = "";
+  let lastErr = "";
   p.stdout.on("data", (d) => {
     buf += d.toString();
     let i;
@@ -91,14 +123,20 @@ function ensureChild() {
   });
   p.stderr.on("data", (d) => {
     const s = d.toString().trim();
-    if (s) process.stderr.write(`[claude] ${s.slice(0, 500)}\n`);
+    if (s) {
+      lastErr = s.slice(0, 300);
+      process.stderr.write(`[claude] ${s.slice(0, 500)}\n`);
+    }
   });
   p.on("exit", (code) => {
     child = null;
     busy = false;
     for (const id of pending.keys()) emit({ type: "permission_resolved", requestId: id, behavior: "deny" });
     pending.clear();
-    emit({ type: "status", message: code === 0 ? "Claude を終了しました" : `Claude が終了しました（code ${code}）。次の送信で再開します` });
+    const hint = /log ?in|auth|credential|token/i.test(lastErr)
+      ? " Claude にログインしていない可能性があります。ターミナルで claude を起動してログインしてください"
+      : "";
+    emit({ type: "status", message: code === 0 ? "Claude を終了しました" : `Claude が終了しました（code ${code}）${lastErr ? `: ${lastErr}` : ""}。${hint || "次の送信で再開します"}` });
     emit(state(), false);
   });
   emit({ type: "status", message: sessionId ? "Claude を再開しました" : "Claude を起動しました" });
@@ -344,6 +382,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("Design Desk ローカルClaude連携パネル（ベータ）");
   console.log(`  作業フォルダ : ${ROOT}`);
   console.log(`  プロジェクト : ${PROJECT || "(.env 未設定)"}`);
+  console.log(`  Claude本体   : ${CLAUDE.from}`);
   console.log(`  待ち受け     : http://127.0.0.1:${PORT}（このPC内のみ）`);
   console.log(`  許可オリジン : ${[...allowedOrigins].join(", ")}`);
   console.log("");

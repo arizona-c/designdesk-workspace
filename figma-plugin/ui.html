@@ -153,7 +153,15 @@
 <script>
   const app = document.getElementById("app");
   let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, compImages: false, comments: null, commentsFor: null, commentBusy: false };
-  const API = "https://designdesk.arizona-c.com/api/plugin";
+  // 接続先（Design Desk の URL）。既定は Arizona 運営の本番。独立デプロイの組織は設定画面で自組織の URL に変える（clientStorage に保存）
+  const DEFAULT_BASE = "https://designdesk.arizona-c.com";
+  let BASE = DEFAULT_BASE;
+  let API = BASE + "/api/plugin";
+  function setBase(url) {
+    const u = (url || "").trim().replace(/\/+$/, "");
+    BASE = /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(u) ? u : DEFAULT_BASE;
+    API = BASE + "/api/plugin";
+  }
 
   parent.postMessage({ pluginMessage: { type: "init" } }, "*");
 
@@ -232,6 +240,7 @@
     } else if (m.type === "goto-result") {
       if (!m.ok && m.url) window.open(m.url, "_blank");
     } else if (m.type === "settings") {
+      setBase(m.url);
       S.token = m.token; S.project = m.project; S.fileKey = m.fileKey; S.fileName = m.fileName;
       if (m.sort) S.sort = m.sort;
       S.onlyDoing = !!m.onlyDoing;
@@ -304,7 +313,7 @@
     help.style.display = connected ? "" : "none";
     if (connected) proj.textContent = S.data.project.name;
     reload.onclick = load;
-    help.onclick = () => window.open("https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/faq#" + encodeURIComponent("Figmaプラグイン"), "_blank");
+    help.onclick = () => window.open(BASE + "/" + encodeURIComponent(S.project) + "/faq#" + encodeURIComponent("Figmaプラグイン"), "_blank");
   }
 
   function render() {
@@ -328,12 +337,16 @@
       '<p class="sub">Design Desk のアカウントメニュー →「アクセストークン」で発行した dd_pat_… を貼り付けてください。</p>' +
       '<div class="mt"><input id="project" placeholder="プロジェクトID（ディレクターから聞いた名前。例: app-dev）" value="' + esc(S.project || "") + '"></div>' +
       '<div class="mt"><input id="token" type="password" placeholder="dd_pat_…"></div>' +
+      '<details class="mt"' + (BASE !== DEFAULT_BASE ? " open" : "") + '><summary class="sub">接続先を変更（自社環境に Design Desk を設置している組織のみ）</summary>' +
+      '<div class="mt"><input id="url" placeholder="' + esc(DEFAULT_BASE) + '" value="' + esc(BASE) + '"></div></details>' +
       '<p class="mt"><button class="btn primary" id="save">接続する</button></p>' + msgHtml());
     document.getElementById("save").onclick = () => {
       const project = document.getElementById("project").value.trim();
       const token = document.getElementById("token").value.trim();
+      const url = (document.getElementById("url").value || "").trim().replace(/\/+$/, "") || DEFAULT_BASE;
       if (!project || !token) return;
-      parent.postMessage({ pluginMessage: { type: "save-settings", token, project } }, "*");
+      if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) { S.msg = { t: "err", text: "接続先は https:// で始まる URL（パスなし）を入力してください" }; render(); return; }
+      parent.postMessage({ pluginMessage: { type: "save-settings", token, project, url } }, "*");
     };
   }
 
@@ -536,7 +549,7 @@
     app.innerHTML = viewWrap(
       '<div class="row" style="justify-content:space-between">' + backLink() +
       '<span class="row" style="gap:10px">' +
-      '<a href="' + esc("https://designdesk.arizona-c.com/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DesignDeskで開く</a>" +
+      '<a href="' + esc(BASE + "/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DesignDeskで開く</a>" +
       '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></span></div>" +
       '<div class="row mt" style="gap:5px"><span class="chip seq">#' + t.seq + '</span>' +
       '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +

@@ -1,26 +1,26 @@
-# Design Desk Figmaプラグイン（開発版）
+# Design Desk Figmaプラグイン
 
-Figmaの中から、自分のチケットの確認・選択中Frameの紐づけ・列移動（作業中/レビュー提出）ができる。
-開発版プラグインのため**Figmaの審査・申請は不要**（Community公開する場合のみ審査あり）。
+Figma の中から、自分のチケットの確認・選択中 Frame の紐づけ・キャプチャ登録・列移動（作業中 / レビュー提出）・コンポーネント同期・デザインシステム同期ができる。
 
-## 導入手順（1人1回・約1分）
+## 入れ方（2通り）
 
-1. **Figmaデスクトップアプリ**で任意のファイルを開く（ブラウザ版では導入不可）
-2. メニュー → Plugins（プラグイン）→ Development（開発）→ **Import plugin from manifest…（マニフェストからプラグインをインポート…）**
-3. このフォルダの `manifest.json` を選択
-4. Plugins（プラグイン）→ Development（開発）→ **Design Desk** で起動
-5. 初回はプロジェクトID（例: app-dev）と、プラグイン用に発行した個人アクセストークンを入力
-   （アカウントメニュー→アクセストークンで「Figmaプラグイン」の名前で発行。既存トークンは無効にならない）
+### A. Figma Community から（公開後・審査済み版）
+1. Figma で Plugins → 「Design Desk」を検索して実行
+2. 初回に、プロジェクトID（例: app-dev）と、プラグイン用に発行した個人アクセストークン（Design Desk のアカウントメニュー → アクセストークン）を入力
+3. 自社環境に Design Desk を設置している組織は「接続先を変更」を開いて自社の URL を入力（既定は designdesk.arizona-c.com）
 
-## できること
+### B. 開発版として読み込む（審査を待たずに最新を使う・従来どおり）
+1. Figma デスクトップアプリで任意のファイルを開く
+2. Plugins → Development → **Import plugin from manifest…** で、このフォルダの `manifest.json` を選ぶ
+3. Plugins → Development → Design Desk で起動
 
-- 自分の担当/レビュー中チケットの一覧・詳細
-- **選択中のFrameをチケットに紐づけ**（複数可・node-idからURL自動生成）
-- チケットを「作業中へ」「レビューへ提出」
+A と B は同時に入っていてもよい。緊急の修正は B が先に届き、A は審査（更新のたび）を経て反映される。
 
 ## 補足
+- 通信先は利用者が設定した Design Desk のサーバーだけ（`manifest.json` の networkAccess は独立設置の組織に対応するため `*` とし、理由を記載）
+- `figma.fileKey` は組織の非公開プラグイン専用の API のため、Community 版・開発版とも取得できない。ファイルごとに初回だけ URL を貼ってもらい、プラグインが記憶する
+- トークン・接続先は Figma の clientStorage に保存する。Figma ファイルには何も書き込まない
+- プライバシーポリシー: https://designdesk.arizona-c.com/privacy
 
-- 通信先は Design Desk 本番（`manifest.json` の networkAccess で制限）
-- 開発版では `figma.fileKey` が取得できないため、ファイルごとに初回だけURLを貼ってもらう
-  （プラグインが記憶する）。組織プランで正式配布する場合はこの手順は不要になる
-- トークン等は Figma の clientStorage に保存（ファイルには書き込まない）
+## Community への公開手順（オーナー作業・Figma デスクトップアプリで行う）
+`COMMUNITY.md` を参照。

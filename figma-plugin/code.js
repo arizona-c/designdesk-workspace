@@ -19,9 +19,10 @@ figma.clientStorage.deleteAsync("dd_filekey_0:0");
 async function sendSettings() {
   const token = await figma.clientStorage.getAsync("dd_token");
   const project = await figma.clientStorage.getAsync("dd_project");
+  const url = (await figma.clientStorage.getAsync("dd_url")) || null; // 接続先（独立デプロイの組織のみ設定・未設定なら UI 側の既定）
   const sort = (await figma.clientStorage.getAsync("dd_sort")) || "list";
   const onlyDoing = (await figma.clientStorage.getAsync("dd_only_doing")) || false;
-  // fileKeyは開発版プラグインでは取れないことがある → その場合はUIでURL貼り付けを促し、ファイル毎に保存。
+  // fileKey は Community 公開のプラグインでは取得できない（figma.fileKey は組織の非公開プラグイン限定）→ UIでURL貼り付けを促し、ファイル毎に保存。
   // 保存キーはファイル名ベース。旧実装のroot.idは全ファイル共通"0:0"のため、別ファイルのfileKeyを
   // 返してしまい同期先プロダクトを誤る事故があった（2026-09-02修正）。ファイル名変更時は再貼り付けを促す
   let fileKey = figma.fileKey || null;
@@ -32,6 +33,7 @@ async function sendSettings() {
     type: "settings",
     token: token || null,
     project: project || null,
+    url: url,
     fileKey: fileKey,
     fileName: figma.root.name,
     sort: sort,
@@ -53,6 +55,7 @@ figma.ui.onmessage = async (msg) => {
   } else if (msg.type === "save-settings") {
     await figma.clientStorage.setAsync("dd_token", msg.token);
     await figma.clientStorage.setAsync("dd_project", msg.project);
+    if (msg.url) await figma.clientStorage.setAsync("dd_url", msg.url);
     await sendSettings();
   } else if (msg.type === "save-filekey") {
     await figma.clientStorage.setAsync("dd_filekey_name_" + figma.root.name, msg.fileKey);

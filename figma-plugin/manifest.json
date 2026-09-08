@@ -7,7 +7,7 @@
   "editorType": ["figma"],
   "documentAccess": "dynamic-page",
   "networkAccess": {
-    "allowedDomains": ["https://designdesk.arizona-c.com", "https://arizona-designdesk.vercel.app"],
-    "reasoning": "Design Desk（チケットボード）との連携"
+    "allowedDomains": ["*"],
+    "reasoning": "This plugin is a companion for Design Desk, a self-hostable design-operations service. It only talks to the Design Desk server the user configures in the plugin (default: https://designdesk.arizona-c.com; organizations that run their own instance enter their own https URL). No other hosts are contacted. / 本プラグインは Design Desk（組織ごとに独立設置できる業務基盤）の連携用で、利用者がプラグイン内で設定した Design Desk のサーバー（既定 https://designdesk.arizona-c.com、自社設置の組織はその URL）にのみ通信します。"
   }
 }

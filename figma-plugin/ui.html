@@ -182,7 +182,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", reportCapture: true, commentsOpen: true, expanded: {}, reportDraft: null, commentDraft: null, reportBusy: false, captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
+  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", commentsOpen: true, expanded: {}, reportDraft: null, commentDraft: null, reportBusy: false, captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
   // 接続先（Design Desk の URL）。既定は Arizona 運営の本番。独立デプロイの組織は設定画面で自組織の URL に変える（clientStorage に保存）
   const DEFAULT_BASE = "https://designdesk.arizona-c.com";
   let BASE = DEFAULT_BASE;
@@ -276,7 +276,6 @@
       if (m.sort) S.sort = m.sort;
       S.onlyDoing = !!m.onlyDoing;
       S.scope = m.scope === "all" ? "all" : "mine";
-      S.reportCapture = m.reportCapture !== false;
       if (S.token && S.project) load(); else render();
     } else if (m.type === "selection") {
       S.selection = m.nodes; render();
@@ -307,7 +306,7 @@
         : img.name;
       try {
         const r = await api("POST", null, { action: "upload_capture", seq, phase, node_name: name, data: img.data });
-        done.push({ id: r.id, name, nodeId: img.id });
+        done.push({ id: r.id, name });
       } catch (err) { /* サイズ超過等はスキップして続行 */ }
     }
     return done;
@@ -336,13 +335,6 @@
         : esc(p)
     ).join("");
   }
-  function insertAtCursor(value, start, end, text) {
-    const before = value.slice(0, start), after = value.slice(end);
-    const lead = before.length === 0 || before.endsWith("\n") ? "" : "\n";
-    const trail = after.length === 0 || after.startsWith("\n") ? "" : "\n";
-    return { value: before + lead + text + trail + after, cursor: (before + lead + text).length };
-  }
-
   function go(patch, dir) { Object.assign(S, patch); S.dir = dir || "fwd"; render(); }
 
   // Markdown の簡易描画（Web と同じ書き方が読める最小セット・2026-09-08）。
@@ -710,14 +702,14 @@
 
       '<div class="section"><h2>作業報告</h2>' +
       '<p class="faint" style="font-size:10px;margin:0 0 4px">作業が完了したらここに完了報告を書きます。レビュー時に最上位に表示されます</p>' +
-      // 作業した Frame を報告に残す入口（2026-09-08 オーナー要望）: 紐づけ＋報告本文にリンク行、任意でキャプチャも撮って画像として差し込む
-      '<div style="border:1px dashed var(--line-strong);border-radius:6px;padding:6px 8px;margin:0 0 6px">' +
+      // 作業した Frame の記録（2026-09-08 オーナー要望）: 「キャプチャを取得」で Figma リンクとキャプチャ画像をチケットに添付するだけ。文章の入力欄とは分ける
+      '<div style="border:1px dashed var(--line-strong);border-radius:6px;padding:6px 8px;margin:0 0 8px">' +
+      '<p style="font-size:10px;font-weight:700;margin:0 0 4px">作業したFrameの記録</p>' +
       (S.selection.length
-        ? '<p style="font-size:11px;margin:0 0 5px" class="sub">' + I.target + " " + selNames + "</p>"
-        : '<p class="faint" style="font-size:10px;margin:0 0 5px">作業したFrameをキャンバスで選択すると、ここから報告に差し込めます</p>') +
-      '<div class="row" style="gap:8px;flex-wrap:wrap">' +
-      '<label style="display:inline-flex;align-items:center;gap:4px;font-size:10px;cursor:pointer"><input type="checkbox" id="rp-cap"' + (S.reportCapture ? " checked" : "") + ' style="width:auto;margin:0">キャプチャも撮って貼る</label>' +
-      '<button class="btn primary sm" id="rp-insert" style="margin-left:auto"' + (S.selection.length && !needKey && !S.reportBusy ? "" : " disabled") + ' title="選択中のFrameをチケットに紐づけ、報告本文にリンク（とキャプチャ）を差し込みます">' + I.link + (S.reportBusy ? "差し込み中…" : "報告に差し込む") + "</button></div>" +
+        ? '<p style="font-size:11px;margin:0 0 6px" class="sub">' + I.target + " " + selNames + "</p>"
+        : '<p class="faint" style="font-size:10px;margin:0 0 6px">作業したFrameをキャンバスで選択してください（複数可）</p>') +
+      '<div class="row" style="gap:8px"><button class="btn primary sm" id="rp-capture"' + (S.selection.length && !needKey && !S.reportBusy ? "" : " disabled") + ' title="選択中のFrameのFigmaリンクとキャプチャ画像をこのチケットに添付します">' + I.camera + (S.reportBusy ? "取得中…" : "キャプチャを取得") + "</button>" +
+      '<span class="faint" style="font-size:10px">Figmaリンクとキャプチャがこのチケットに添付されます</span></div>' +
       (needKey && S.selection.length ? '<p class="faint" style="font-size:10px;margin:5px 0 0">先に上の「Figmaリンク」でこのファイルのURLを追加してください</p>' : "") +
       "</div>" +
       '<textarea id="rp-body" placeholder="変更点・対象画面・確認したこと・気になる点（簡潔・事実ベースで）" style="min-height:56px;font-size:11px">' + esc(S.reportDraft && S.reportDraft.seq === t.seq ? S.reportDraft.value : (t.report || "")) + "</textarea>" +
@@ -802,43 +794,25 @@
     };
     const capcancel = document.getElementById("capcancel");
     if (capcancel) capcancel.onclick = () => { S.capturing = false; render(); };
-    const rpCap = document.getElementById("rp-cap");
-    if (rpCap) rpCap.onchange = () => {
-      S.reportCapture = rpCap.checked;
-      parent.postMessage({ pluginMessage: { type: "save-report-capture", value: S.reportCapture } }, "*");
-    };
-    const rpIns = document.getElementById("rp-insert");
-    if (rpIns) rpIns.onclick = async () => {
+    const rpCap = document.getElementById("rp-capture");
+    if (rpCap) rpCap.onclick = async () => {
       const sel = S.selection.slice();
       if (!sel.length || S.reportBusy) return;
-      const ta = document.getElementById("rp-body");
-      const draft = { value: ta.value, start: ta.selectionStart, end: ta.selectionEnd };
-      S.reportDraft = { seq: t.seq, value: draft.value }; // 再描画で消えないよう state に退避
-      S.reportBusy = true; S.msg = { t: "ok", text: S.reportCapture ? "紐づけとキャプチャを記録しています…" : "紐づけています…" }; render();
+      S.reportBusy = true; S.msg = { t: "ok", text: "Figmaリンクとキャプチャを記録しています…" }; render();
       try {
         const urls = sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
         const names = sel.map((n) => n.name);
         await api("POST", null, { action: "attach_frames", seq: t.seq, urls, names });
-        const caps = S.reportCapture ? await uploadCaptures(t.seq, "manual", sel.map((n) => n.id), null) : [];
-        // 報告本文に差し込む行: Frame ごとにリンク行、直後に撮れたキャプチャの画像参照
-        const lines = [];
-        sel.forEach((n, i) => {
-          lines.push("- [" + n.name.replace(/[\[\]]/g, "") + "](" + urls[i] + ")");
-          const c = caps.find((x) => x.nodeId === n.id); // 同名Frameがあっても取り違えない
-          if (c && c.id) lines.push("![" + n.name.replace(/[\[\]]/g, "") + "](capture:" + c.id + ")");
-        });
-        const ins = insertAtCursor(draft.value, draft.start, draft.end, lines.join("\n"));
-        draft.value = ins.value; draft.start = draft.end = ins.cursor;
-        S.reportDraft = { seq: t.seq, value: draft.value };
+        const caps = await uploadCaptures(t.seq, "manual", sel.map((n) => n.id), null);
         await load(); S.open = t.seq;
-        if (S.reportCapture) loadComments(t.seq); // 差し込んだ画像を同じチケットの添付として解決できるように
-        S.msg = { t: "ok", text: sel.length + "件のFrameを報告に差し込みました" + (S.reportCapture ? "（キャプチャ" + caps.length + "件）" : "") + "。内容を書き足して「保存」してください" };
-        parent.postMessage({ pluginMessage: { type: "notify", message: "報告に差し込みました" } }, "*");
+        loadComments(t.seq); // キャプチャ一覧を最新に
+        S.msg = caps.length
+          ? { t: "ok", text: "Figmaリンク" + sel.length + "件とキャプチャ" + caps.length + "件をチケットに添付しました" }
+          : { t: "err", text: "Figmaリンクは紐づけましたが、キャプチャを記録できませんでした（サイズ超過の可能性）" };
+        parent.postMessage({ pluginMessage: { type: "notify", message: caps.length ? "リンクとキャプチャを添付しました" : "キャプチャを記録できませんでした" } }, "*");
       } catch (err) { S.msg = { t: "err", text: err.message }; }
       S.reportBusy = false;
       render();
-      const ta2 = document.getElementById("rp-body");
-      if (ta2) { ta2.focus(); ta2.setSelectionRange(draft.start, draft.end); }
     };
     const rpBody = document.getElementById("rp-body");
     rpBody.oninput = () => { S.reportDraft = { seq: t.seq, value: rpBody.value }; };

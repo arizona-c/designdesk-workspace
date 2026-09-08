@@ -4,3 +4,7 @@ local/
 .claude/settings.local.json
 .claude/designdesk-rules.md
 .mcp.json
+.claude/.synced-version
+.claude/.stale-checked
+.claude/.template-synced
+.claude/.sync-headers.tmp

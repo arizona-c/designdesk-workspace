@@ -63,11 +63,14 @@ sync_designdesk() {
     return 0
   fi
   mkdir -p .claude
+  SYNCED_VERSION=$(cat .claude/.synced-version 2>/dev/null | tr -dc '0-9')
   local hdrs=".claude/.sync-headers.tmp"
   if curl -fsS -m 10 -D "$hdrs" -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
     "$DESIGNDESK_URL/api/sync/claude-md?project=$DESIGNDESK_PROJECT" \
     -o .claude/designdesk-rules.md.tmp; then
     mv .claude/designdesk-rules.md.tmp .claude/designdesk-rules.md
+    SYNCED_VERSION=$(grep -i '^x-rules-version:' "$hdrs" | tr -dc '0-9')
+    echo "${SYNCED_VERSION:-0}" > .claude/.synced-version
     # この同期成功の瞬間、Design Desk側のサイドバーの連携チップも🟢になる（last_used_at更新）
     echo "🔗 Design Desk と連携しました（プロジェクト: $DESIGNDESK_PROJECT）— Web側サイドバーにも「Claude連携中」が点灯します"
     echo "✅ 最新ルールを同期しました（$(head -1 .claude/designdesk-rules.md | sed 's/# //')）"
@@ -98,7 +101,7 @@ sync_designdesk() {
     "designdesk": {
       "type": "http",
       "url": "$DESIGNDESK_URL/api/mcp?project=$DESIGNDESK_PROJECT",
-      "headers": { "Authorization": "Bearer $DESIGNDESK_TOKEN" }
+      "headers": { "Authorization": "Bearer $DESIGNDESK_TOKEN", "X-DD-Synced-Version": "${SYNCED_VERSION:-0}" }
     },
     "figma": {
       "type": "http",
@@ -112,8 +115,28 @@ MCPEOF
   fi
 }
 
+# --if-stale: メッセージ送信ごとのフック（UserPromptSubmit）から呼ばれる軽い確認。10分に1回まで Design Desk に版だけ問い合わせ、
+# 手元の同期版と同じなら何も出さずに終わる。差分がある時だけ本同期を走らせる（ターミナル版で長時間つけっぱなしでも最新に追随する）
+stale_check() {
+  set -a; [ -f .env ] && . ./.env; set +a
+  [ -n "${DESIGNDESK_TOKEN:-}" ] && [ -n "${DESIGNDESK_URL:-}" ] && [ -n "${DESIGNDESK_PROJECT:-}" ] || exit 0
+  local stamp=".claude/.stale-checked"
+  if [ -f "$stamp" ] && [ -n "$(find "$stamp" -mmin -10 2>/dev/null)" ]; then exit 0; fi
+  mkdir -p .claude; touch "$stamp"
+  local local_v remote_v
+  local_v=$(cat .claude/.synced-version 2>/dev/null | tr -dc '0-9')
+  remote_v=$(curl -fsS -m 5 -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
+    "$DESIGNDESK_URL/api/sync/claude-md?project=$DESIGNDESK_PROJECT&check=1" 2>/dev/null | tr -dc '0-9')
+  [ -n "$remote_v" ] || exit 0
+  if [ "$local_v" = "$remote_v" ]; then exit 0; fi
+  echo "🔄 案件ルールが v${local_v:-?} → v${remote_v} に更新されていたため同期しました。.claude/designdesk-rules.md を読み直してから続けてください"
+  sync_designdesk >/dev/null 2>&1
+  exit 0
+}
+
 # ここまでで全関数の定義が終わってから実行する（{ } でまとめて読み込ませ、pull後のファイル読み違いを防ぐ）
 {
+  if [ "${1:-}" = "--if-stale" ]; then stale_check; fi
   self_update
   sync_designdesk
   exit 0

@@ -1,5 +1,15 @@
 {
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash sync.sh --if-stale"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

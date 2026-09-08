@@ -101,6 +101,22 @@
   a:hover { text-decoration: underline; }
 
   /* 詳細のセクション枠 */
+  .scopebtn { border: 0; background: var(--surface2); color: var(--ink-mid); font-size: 10px; padding: 3px 9px; cursor: pointer; }
+  .scopebtn.on { background: var(--btn); color: var(--btn-ink); }
+  .md { font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+  .md p { margin: 0; }
+  .md .mdgap { height: 6px; }
+  .md .mdh { font-weight: 700; margin-top: 6px; }
+  .md .mdq { border-left: 2px solid var(--line-strong); padding-left: 8px; color: var(--ink-mid); }
+  .md ul, .md ol { margin: 2px 0; padding-left: 18px; }
+  .md code { background: var(--surface2); border-radius: 3px; padding: 0 3px; font-family: ui-monospace, monospace; font-size: 10px; }
+  .md pre { background: var(--surface2); border-radius: 6px; padding: 6px 8px; font-size: 10px; overflow-x: auto; margin: 4px 0; white-space: pre; }
+  .md hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+  .md .mdimg { max-width: 100%; max-height: 220px; border: 1px solid var(--line); border-radius: 6px; margin: 4px 0; display: block; }
+  .md .mdtable { border-collapse: collapse; font-size: 10px; margin: 4px 0; }
+  .md .mdtable th, .md .mdtable td { border: 1px solid var(--line); padding: 2px 6px; text-align: left; vertical-align: top; }
+  .md .mdtable th { background: var(--surface2); font-weight: 700; }
+  .md .mention { background: var(--blue-bg); color: var(--blue-ink); border-radius: 3px; padding: 0 3px; }
   .section { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; margin-top: 8px; }
   .section h2 { margin: 0 0 6px; }
   .framelink { display: flex; align-items: center; gap: 5px; font-size: 11px; margin-top: 3px; }
@@ -152,7 +168,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, compImages: false, comments: null, commentsFor: null, commentBusy: false };
+  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
   // 接続先（Design Desk の URL）。既定は Arizona 運営の本番。独立デプロイの組織は設定画面で自組織の URL に変える（clientStorage に保存）
   const DEFAULT_BASE = "https://designdesk.arizona-c.com";
   let BASE = DEFAULT_BASE;
@@ -244,6 +260,7 @@
       S.token = m.token; S.project = m.project; S.fileKey = m.fileKey; S.fileName = m.fileName;
       if (m.sort) S.sort = m.sort;
       S.onlyDoing = !!m.onlyDoing;
+      S.scope = m.scope === "all" ? "all" : "mine";
       if (S.token && S.project) load(); else render();
     } else if (m.type === "selection") {
       S.selection = m.nodes; render();
@@ -251,7 +268,9 @@
   };
 
   async function api(method, params, body) {
-    const res = await fetch(API + "?project=" + encodeURIComponent(S.project), {
+    let url = API + "?project=" + encodeURIComponent(S.project);
+    if (params) url += "&" + new URLSearchParams(params).toString();
+    const res = await fetch(url, {
       method,
       headers: { Authorization: "Bearer " + S.token, "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
@@ -278,15 +297,15 @@
   }
 
   async function loadComments(seq) {
-    S.commentsFor = seq; S.comments = null;
+    S.commentsFor = seq; S.comments = null; S.captures = null;
     try {
       const r = await api("POST", null, { action: "comments", seq });
-      if (S.commentsFor === seq) { S.comments = r.comments; render(); }
-    } catch (err) { if (S.commentsFor === seq) { S.comments = []; render(); } }
+      if (S.commentsFor === seq) { S.comments = r.comments; S.captures = r.captures || []; render(); }
+    } catch (err) { if (S.commentsFor === seq) { S.comments = []; S.captures = []; render(); } }
   }
 
   async function load() {
-    try { S.data = await api("GET"); S.msg = null; }
+    try { S.data = await api("GET", S.scope === "all" ? { scope: "all" } : null); S.msg = null; }
     catch (err) { S.data = null; S.msg = { t: "err", text: err.message }; }
     render();
   }
@@ -301,6 +320,64 @@
     ).join("");
   }
   function go(patch, dir) { Object.assign(S, patch); S.dir = dir || "fwd"; render(); }
+
+  // Markdown の簡易描画（Web と同じ書き方が読める最小セット・2026-09-08）。
+  // 先にHTMLエスケープしてから記法を置き換えるので、生HTMLは描画されない。
+  // 対応: 見出し（# / 【…】行）・太字・取り消し・インラインコード・コードブロック・箇条書き/番号・引用・区切り線・表・
+  // リンク [t](url) / 裸URL・画像 ![説明](capture:ID)（同じチケットの添付だけ）/ 外部画像・@メンションの帯・改行はそのまま
+  function mdInline(s, images) {
+    let h = esc(s);
+    h = h.replace(/`([^`]+)`/g, (m, c) => '<code>' + c + '</code>');
+    h = h.replace(/!\[([^\]]*)\]\(capture:([0-9a-f-]{36})\)/g, (m, alt, id) => {
+      const hit = images && images[id];
+      return hit ? '<a href="' + esc(hit.url) + '" target="_blank"><img class="mdimg" src="' + esc(hit.url) + '" alt="' + alt + '"></a>' : '<span class="faint">（削除された画像' + (alt ? ": " + alt : "") + '）</span>';
+    });
+    h = h.replace(/!\[([^\]]*)\]\((https?:[^\s)]+)\)/g, (m, alt, u) => '<img class="mdimg" src="' + u + '" alt="' + alt + '">');
+    h = h.replace(/\[([^\]]+)\]\((https?:[^\s)]+)\)/g, (m, t, u) => '<a href="' + u + '" target="_blank">' + t + '</a>');
+    h = h.replace(/(^|[^"'>])(https?:\/\/[^\s<>"]+)/g, (m, pre, u) => pre + '<a href="' + u + '" target="_blank" style="word-break:break-all">' + u + '</a>');
+    h = h.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    h = h.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+    h = h.replace(/(^|[\s　])[@＠]([^\s@＠<]{1,20})/g, (m, pre, n) => pre + '<span class="mention">@' + n + '</span>');
+    return h;
+  }
+  function md(text, images) {
+    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    const out = []; let list = null; let inCode = false; let code = []; let table = null;
+    const closeList = () => { if (list) { out.push("</" + list + ">"); list = null; } };
+    const closeTable = () => { if (table) { out.push("<table class=\"mdtable\">" + table.join("") + "</table>"); table = null; } };
+    for (const raw of lines) {
+      if (/^```/.test(raw)) { if (inCode) { out.push("<pre>" + code.join("\n") + "</pre>"); code = []; inCode = false; } else { closeList(); closeTable(); inCode = true; } continue; }
+      if (inCode) { code.push(esc(raw)); continue; }
+      const line = raw.replace(/\s+$/, "");
+      let m;
+      if ((m = line.match(/^\|(.+)\|$/))) {
+        closeList();
+        const cells = m[1].split("|").map((c) => c.trim());
+        if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue; // 区切り行
+        if (!table) table = [];
+        const tag = table.length === 0 ? "th" : "td";
+        table.push("<tr>" + cells.map((c) => "<" + tag + ">" + mdInline(c, images) + "</" + tag + ">").join("") + "</tr>");
+        continue;
+      }
+      closeTable();
+      if (line === "") { closeList(); out.push('<div class="mdgap"></div>'); continue; }
+      if ((m = line.match(/^\s*【[^】]{1,40}】\s*$/)) || (m = line.match(/^#{1,4}\s+(.+)$/))) { closeList(); out.push('<p class="mdh">' + mdInline(m[1] || line.trim(), images) + "</p>"); continue; }
+      if (/^-{3,}$/.test(line)) { closeList(); out.push("<hr>"); continue; }
+      if ((m = line.match(/^\s*[-*]\s+(.*)$/))) { if (list !== "ul") { closeList(); list = "ul"; out.push("<ul>"); } out.push("<li>" + mdInline(m[1], images) + "</li>"); continue; }
+      if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (list !== "ol") { closeList(); list = "ol"; out.push("<ol>"); } out.push("<li>" + mdInline(m[1], images) + "</li>"); continue; }
+      if ((m = line.match(/^>\s?(.*)$/))) { closeList(); out.push('<p class="mdq">' + mdInline(m[1], images) + "</p>"); continue; }
+      closeList();
+      out.push("<p>" + mdInline(line, images) + "</p>");
+    }
+    if (inCode) out.push("<pre>" + code.join("\n") + "</pre>");
+    closeList(); closeTable();
+    return '<div class="md">' + out.join("") + "</div>";
+  }
+  function captureMap() {
+    const map = {};
+    for (const c of S.captures || []) map[c.id] = c;
+    return map;
+  }
 
   // ---- ヘッダー ----
   function syncHeader() {
@@ -362,8 +439,9 @@
       '<div class="card" data-seq="' + t.seq + '">' +
       '<div class="row" style="gap:5px">' +
       '<span class="chip seq">#' + t.seq + "</span>" +
-      '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +
+      (t.role ? '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" : "") +
       '<span class="chip">' + esc(t.column) + "</span>" +
+      (S.scope === "all" && t.assigneeName ? '<span class="faint" style="font-size:10px">' + esc(t.assigneeName) + "</span>" : "") +
       (t.due ? '<span class="faint" style="font-size:10px;margin-left:auto">期日 ' + esc(t.due.slice(5).replace("-", "/")) + "</span>" : "") +
       "</div>" +
       '<div class="title">' + esc(t.title) + "</div>" +
@@ -387,8 +465,12 @@
     if (S.open != null) { renderDetail(); return; }
     app.innerHTML = viewWrap(
       '<div class="row" style="justify-content:space-between">' +
-      "<h1 style=\"margin:0\">自分のチケット</h1>" +
-      '<span class="row" style="gap:6px"><select id="sort" title="表示順" style="width:auto;padding:2px 24px 2px 8px;font-size:10px;border-radius:99px;background-color:var(--surface2);border:none;color:var(--ink-mid)">' +
+      "<h1 style=\"margin:0\">" + (S.scope === "all" ? "すべてのチケット" : "自分のチケット") + "</h1>" +
+      '<span class="row" style="gap:6px">' +
+      '<span class="row" style="gap:0;border:1px solid var(--line);border-radius:99px;overflow:hidden">' +
+      '<button class="scopebtn' + (S.scope === "mine" ? " on" : "") + '" data-scope="mine" title="自分が担当・レビューのチケット">自分</button>' +
+      '<button class="scopebtn' + (S.scope === "all" ? " on" : "") + '" data-scope="all" title="プロジェクトの全チケット（完了を除く）">全員</button></span>' +
+      '<select id="sort" title="表示順" style="width:auto;padding:2px 24px 2px 8px;font-size:10px;border-radius:99px;background-color:var(--surface2);border:none;color:var(--ink-mid)">' +
       '<option value="list"' + (S.sort === "list" ? " selected" : "") + '>リスト順</option>' +
       '<option value="due"' + (S.sort === "due" ? " selected" : "") + '>期日が近い順</option>' +
       '<option value="id"' + (S.sort === "id" ? " selected" : "") + '>ID順</option>' +
@@ -433,10 +515,16 @@
         const list = S.onlyDoing ? d.tickets.filter((t) => t.columnRole === "doing") : d.tickets;
         return list.length
           ? sortedTickets(list).map(ticketCard).join("")
-          : '<div class="empty">' + (S.onlyDoing ? "作業中のチケットはありません" : "進行中の担当チケットはありません") + "</div>";
+          : '<div class="empty">' + (S.onlyDoing ? "作業中のチケットはありません" : S.scope === "all" ? "進行中のチケットはありません" : "進行中の担当チケットはありません") + "</div>";
       })() +
       msgHtml());
     app.querySelectorAll(".card").forEach((c) => (c.onclick = () => { const sq = Number(c.dataset.seq); loadComments(sq); go({ open: sq, msg: null }, "fwd"); }));
+    app.querySelectorAll(".scopebtn").forEach((b) => (b.onclick = () => {
+      if (S.scope === b.dataset.scope) return;
+      S.scope = b.dataset.scope;
+      parent.postMessage({ pluginMessage: { type: "save-scope", value: S.scope } }, "*");
+      S.data = null; render(); load();
+    }));
     document.getElementById("sort").onchange = (e) => {
       S.sort = e.target.value;
       parent.postMessage({ pluginMessage: { type: "save-sort", sort: S.sort } }, "*");
@@ -559,22 +647,21 @@
       '<a href="' + esc(BASE + "/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DesignDeskで開く</a>" +
       '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></span></div>" +
       '<div class="row mt" style="gap:5px"><span class="chip seq">#' + t.seq + '</span>' +
-      '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" +
+      (t.role ? '<span class="chip' + (t.role === "レビュー" ? " rev" : " own") + '">' + esc(t.role) + "</span>" : (t.assigneeName ? '<span class="chip">' + esc(t.assigneeName) + "</span>" : "")) +
       // 状態セレクター（チップの並びに溶け込むリスト移動）
       '<select id="status" style="width:auto;padding:2px 24px 2px 8px;font-size:11px;border-radius:99px;background-color:var(--surface2);border:none">' +
       S.data.columns.map((c) => '<option value="' + esc(c.name) + '"' + (c.name === t.column ? " selected" : "") + ">" + esc(c.name) + (c.role === "review" ? "（提出）" : "") + "</option>").join("") +
       "</select></div>" +
       '<h1 class="mt" style="margin-bottom:0">' + esc(t.title) + "</h1>" +
-      (t.description ? '<p class="sub" style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0">' + linkify(t.description) + "</p>" : "") +
+      (t.description ? '<div style="margin:6px 0 0">' + md(t.description, captureMap()) + "</div>" : "") +
 
       '<div class="section"><h2>Figmaリンク</h2>' +
       (t.frames.length
         ? t.frames.map((u, i) => '<a href="#" class="framelink frame-link" data-url="' + esc(u) + '">' + I.link + " " + esc((t.frameNames && t.frameNames[u]) || "Frame " + (i + 1)) + '<span class="faint" style="font-size:9px">（クリックで移動）</span></a>').join("")
         : '<p class="faint" style="font-size:11px;margin:0">まだ紐づけがありません</p>') +
       '<div class="row mt"><input id="addurl" placeholder="FigmaのURLを貼って紐づけ" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px"><button class="btn sm" id="addurlgo">追加</button></div>' +
-      "</div>" +
-
-      '<div class="section"><h2>選択中のFrame</h2>' +
+      // 選択中の Frame はリンクの下位情報（紐づけ・キャプチャの入力元）なので同じ枠の中に置く（2026-09-08 オーナー指摘）
+      '<p style="font-size:10px;font-weight:700;margin:10px 0 4px;border-top:1px solid var(--line);padding-top:8px">選択中のFrame</p>' +
       (S.selection.length
         ? '<p style="font-size:11px;margin:0 0 8px" class="sub">' + I.target + " " + selNames + "</p>"
         : '<p class="faint" style="font-size:11px;margin:0 0 8px">作業対象のFrameをキャンバスで選択してください（複数可）。紐づけておくとレビュアーとClaudeが対象を正確に特定できます。</p>') +
@@ -600,7 +687,7 @@
       (S.comments === null
         ? '<p class="faint" style="font-size:11px;margin:0">読み込み中…</p>'
         : S.comments.length
-          ? S.comments.map((c) => '<div style="margin-bottom:7px"><span class="faint" style="font-size:10px">' + esc(c.author) + " ・ " + esc(c.at) + '</span><div style="font-size:11px;white-space:pre-wrap;line-height:1.5">' + esc(c.body) + "</div></div>").join("")
+          ? S.comments.map((c) => '<div style="margin-bottom:7px"><span class="faint" style="font-size:10px">' + esc(c.author) + " ・ " + esc(c.at) + "</span>" + md(c.body, captureMap()) + "</div>").join("")
           : '<p class="faint" style="font-size:11px;margin:0 0 4px">まだコメントはありません</p>') +
       '<textarea id="cm-body" placeholder="FBコメントを書く（担当者に通知されます）" style="min-height:44px;font-size:11px;margin-top:4px"></textarea>' +
       '<p style="margin:6px 0 0;text-align:right"><button class="btn primary sm" id="cm-send"' + (S.commentBusy ? " disabled" : "") + ">" + I.send + "送信</button></p>" +

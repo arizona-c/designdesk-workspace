@@ -22,6 +22,7 @@ async function sendSettings() {
   const url = (await figma.clientStorage.getAsync("dd_url")) || null; // 接続先（独立デプロイの組織のみ設定・未設定なら UI 側の既定）
   const sort = (await figma.clientStorage.getAsync("dd_sort")) || "list";
   const onlyDoing = (await figma.clientStorage.getAsync("dd_only_doing")) || false;
+  const scope = (await figma.clientStorage.getAsync("dd_scope")) || "mine"; // mine=自分のチケット / all=すべて
   // fileKey は Community 公開のプラグインでは取得できない（figma.fileKey は組織の非公開プラグイン限定）→ UIでURL貼り付けを促し、ファイル毎に保存。
   // 保存キーはファイル名ベース。旧実装のroot.idは全ファイル共通"0:0"のため、別ファイルのfileKeyを
   // 返してしまい同期先プロダクトを誤る事故があった（2026-09-02修正）。ファイル名変更時は再貼り付けを促す
@@ -38,6 +39,7 @@ async function sendSettings() {
     fileName: figma.root.name,
     sort: sort,
     onlyDoing: onlyDoing,
+    scope: scope,
   });
 }
 
@@ -77,6 +79,8 @@ figma.ui.onmessage = async (msg) => {
     await figma.clientStorage.setAsync("dd_sort", msg.sort);
   } else if (msg.type === "save-only-doing") {
     await figma.clientStorage.setAsync("dd_only_doing", msg.value);
+  } else if (msg.type === "save-scope") {
+    await figma.clientStorage.setAsync("dd_scope", msg.value);
   } else if (msg.type === "resize-save") {
     await figma.clientStorage.setAsync("dd_uisize", uiSize);
   } else if (msg.type === "export-nodes") {

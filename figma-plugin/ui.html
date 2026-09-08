@@ -41,6 +41,13 @@
     border-radius: 99px; padding: 2px 8px;
   }
   header .spacer { flex: 1; }
+  /* 詳細・作成・編集の間だけ左端に出る戻るボタン（スティッキーなので下までスクロールしても押せる） */
+  header .hd-back {
+    display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 9px 0 6px; margin-left: -4px;
+    border: 1px solid var(--line-strong); border-radius: 99px; background: var(--surface2); color: inherit;
+    font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  header .hd-back:hover { background: var(--btn); border-color: var(--btn); color: var(--btn-ink); }
   .iconbtn {
     display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;
     border: none; background: none; border-radius: 6px; color: var(--ink-faint); cursor: pointer; padding: 0;
@@ -116,6 +123,12 @@
   .md .mdtable { border-collapse: collapse; font-size: 10px; margin: 4px 0; }
   .md .mdtable th, .md .mdtable td { border: 1px solid var(--line); padding: 2px 6px; text-align: left; vertical-align: top; }
   .md .mdtable th { background: var(--surface2); font-weight: 700; }
+  .cm-clamp { max-height: 88px; overflow: hidden; position: relative; }
+  .cm-clamp::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: linear-gradient(to bottom, transparent, var(--surface)); }
+  .cm-more { display: inline-block; font-size: 10px; color: var(--link); cursor: pointer; margin-top: 2px; }
+  .fold { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+  .fold .chev { display: inline-block; transition: transform .12s; color: var(--ink-faint); }
+  .fold.closed .chev { transform: rotate(-90deg); }
   .md .mention { background: var(--blue-bg); color: var(--blue-ink); border-radius: 3px; padding: 0 3px; }
   .section { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; margin-top: 8px; }
   .section h2 { margin: 0 0 6px; }
@@ -152,7 +165,8 @@
     <rect x="0.5" y="0.5" width="79" height="79" rx="15.5" fill="#FBF7EF" stroke="#D0D0D0"/>
     <path d="M18.8516 17.8125H39.5938C44.7969 17.8125 49.3438 19.0547 53.2344 21.5391C59.1406 25.3828 62.0938 31.2188 62.0938 39.0469C62.0938 45.1875 60.0312 50.2031 55.9062 54.0938C51.6875 58.0312 46.3203 60 39.8047 60H18.8516V58.1016H24.4766V19.7109H18.8516V17.8125ZM39.8047 19.7109H34.3203V58.1016H39.6641C41.8672 58.1016 43.7188 57.6562 45.2188 56.7656C49.1094 54.4688 51.0547 48.4453 51.0547 38.6953C51.0547 33.8203 50.5859 29.9062 49.6484 26.9531C48.0078 22.125 44.7266 19.7109 39.8047 19.7109Z" fill="black"/>
   </svg>
-  <span class="brand">Design Desk</span>
+  <button class="hd-back" id="hd-back" style="display:none" title="一覧へ戻る"></button>
+  <span class="brand" id="hd-brand">Design Desk</span>
   <span class="proj" id="hd-proj" style="display:none"></span>
   <span class="spacer"></span>
   <button class="iconbtn" id="hd-reload" title="更新" style="display:none">
@@ -168,7 +182,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
+  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", reportCapture: true, commentsOpen: true, expanded: {}, reportDraft: null, commentDraft: null, reportBusy: false, captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
   // 接続先（Design Desk の URL）。既定は Arizona 運営の本番。独立デプロイの組織は設定画面で自組織の URL に変える（clientStorage に保存）
   const DEFAULT_BASE = "https://designdesk.arizona-c.com";
   let BASE = DEFAULT_BASE;
@@ -189,6 +203,7 @@
     palette: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
     link: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
     pencil: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+    chev: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
     left: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
     target: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
     external: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
@@ -261,6 +276,7 @@
       if (m.sort) S.sort = m.sort;
       S.onlyDoing = !!m.onlyDoing;
       S.scope = m.scope === "all" ? "all" : "mine";
+      S.reportCapture = m.reportCapture !== false;
       if (S.token && S.project) load(); else render();
     } else if (m.type === "selection") {
       S.selection = m.nodes; render();
@@ -280,20 +296,21 @@
     return j;
   }
 
+  // 撮れて記録できた添付を [{ id, name }] で返す（id は本文差し込み ![name](capture:id) に使う）
   async function uploadCaptures(seq, phase, ids, labelBase) {
     const images = await exportNodes(ids);
-    let ok = 0;
+    const done = [];
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
       const name = labelBase
         ? images.length > 1 ? labelBase + "-" + (i + 1) : labelBase
         : img.name;
       try {
-        await api("POST", null, { action: "upload_capture", seq, phase, node_name: name, data: img.data });
-        ok++;
+        const r = await api("POST", null, { action: "upload_capture", seq, phase, node_name: name, data: img.data });
+        done.push({ id: r.id, name, nodeId: img.id });
       } catch (err) { /* サイズ超過等はスキップして続行 */ }
     }
-    return ok;
+    return done;
   }
 
   async function loadComments(seq) {
@@ -319,6 +336,13 @@
         : esc(p)
     ).join("");
   }
+  function insertAtCursor(value, start, end, text) {
+    const before = value.slice(0, start), after = value.slice(end);
+    const lead = before.length === 0 || before.endsWith("\n") ? "" : "\n";
+    const trail = after.length === 0 || after.startsWith("\n") ? "" : "\n";
+    return { value: before + lead + text + trail + after, cursor: (before + lead + text).length };
+  }
+
   function go(patch, dir) { Object.assign(S, patch); S.dir = dir || "fwd"; render(); }
 
   // Markdown の簡易描画（Web と同じ書き方が読める最小セット・2026-09-08）。
@@ -385,6 +409,21 @@
     const reload = document.getElementById("hd-reload");
     const help = document.getElementById("hd-help");
     const connected = !!(S.token && S.project && S.data);
+    // 一覧より深い画面（詳細・作成・編集）にいる間だけ、ヘッダー左端に戻るボタンを固定表示
+    const back = document.getElementById("hd-back");
+    const brand = document.getElementById("hd-brand");
+    const sub = connected && (S.creating || S.editing || S.open != null);
+    back.style.display = sub ? "" : "none";
+    brand.style.display = sub ? "none" : "";
+    if (sub) {
+      back.innerHTML = I.left + (S.editing ? "詳細へ" : "一覧へ");
+      back.title = S.editing ? "編集をやめて詳細へ戻る" : S.creating ? "作成をやめて一覧へ戻る" : "一覧へ戻る";
+      back.onclick = () => {
+        if (S.editing) go({ editing: false }, "back");
+        else if (S.creating) go({ creating: false }, "back");
+        else go({ open: null, capturing: false }, "back");
+      };
+    }
     proj.style.display = connected ? "" : "none";
     reload.style.display = connected ? "" : "none";
     help.style.display = connected ? "" : "none";
@@ -574,24 +613,18 @@
     if (ac) ac.onclick = (e) => { e.preventDefault(); S.syncPanel = null; render(); };
   }
 
-  function backLink(label, onclick) {
-    return '<a class="backlink" id="back">' + I.left + (label || "一覧へ") + "</a>";
-  }
-
   function renderCreate() {
     const selInfo = S.selection.length
       ? "選択中のFrame（" + S.selection.map((n) => esc(n.name)).join(" / ") + "）を自動で紐づけます"
       : "Frameを選択してから作成すると自動で紐づけます（選択なしでも作成OK）";
     app.innerHTML = viewWrap(
-      backLink() +
-      '<h1 class="mt">チケット作成</h1>' +
+      '<h1>チケット作成</h1>' +
       '<p class="sub">あなたが担当者としてインボックスに登録されます</p>' +
       '<div class="mt"><input id="nt-title" placeholder="タイトル：対象＋やること（略号や内部用語は避けて平易に）"></div>' +
       '<div class="mt"><textarea id="nt-desc" placeholder="メモ（なぜ気になったか・完了条件など。任意）"></textarea></div>' +
       '<p class="mt sub" style="font-size:11px">' + selInfo + "</p>" +
       '<p class="mt"><button class="btn primary" id="nt-create">作成する</button></p>' +
       msgHtml());
-    document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ creating: false }, "back"); };
     document.getElementById("nt-create").onclick = async () => {
       const title = document.getElementById("nt-title").value.trim();
       const description = document.getElementById("nt-desc").value.trim();
@@ -617,14 +650,12 @@
     if (!t) { S.open = null; render(); return; }
     if (S.editing) {
       app.innerHTML = viewWrap(
-        backLink("詳細へ戻る") +
-        '<h1 class="mt">#' + t.seq + " を編集</h1>" +
+        '<h1>#' + t.seq + " を編集</h1>" +
         '<div class="mt"><input id="ed-title" value="' + esc(t.title) + '"></div>' +
         '<div class="mt"><textarea id="ed-desc" placeholder="説明" style="min-height:96px">' + esc(t.description || "") + "</textarea></div>" +
         '<p class="mt row"><button class="btn primary" id="ed-save">保存</button><button class="btn" id="ed-cancel">やめる</button></p>' +
         '<p class="faint" style="font-size:10px">変更は履歴に残り、Webのチケット詳細からいつでも巻き戻せます</p>' +
         msgHtml());
-      document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ editing: false }, "back"); };
       document.getElementById("ed-cancel").onclick = () => go({ editing: false }, "back");
       document.getElementById("ed-save").onclick = async () => {
         const title = document.getElementById("ed-title").value.trim();
@@ -642,7 +673,7 @@
     const selNames = S.selection.map((n) => esc(n.name)).join(" / ");
     const needKey = !S.fileKey;
     app.innerHTML = viewWrap(
-      '<div class="row" style="justify-content:space-between">' + backLink() +
+      '<div class="row" style="justify-content:flex-end">' +
       '<span class="row" style="gap:10px">' +
       '<a href="' + esc(BASE + "/" + encodeURIComponent(S.project) + "/board/" + t.seq) + '" target="_blank" class="backlink" title="Design Deskでチケット詳細を開く">' + I.external + "DesignDeskで開く</a>" +
       '<a href="#" id="edit" class="backlink" title="タイトル・説明を編集">' + I.pencil + "編集</a></span></div>" +
@@ -679,21 +710,39 @@
 
       '<div class="section"><h2>作業報告</h2>' +
       '<p class="faint" style="font-size:10px;margin:0 0 4px">作業が完了したらここに完了報告を書きます。レビュー時に最上位に表示されます</p>' +
-      '<textarea id="rp-body" placeholder="変更点・対象画面・確認したこと・気になる点（簡潔・事実ベースで）" style="min-height:56px;font-size:11px">' + esc(t.report || "") + "</textarea>" +
+      // 作業した Frame を報告に残す入口（2026-09-08 オーナー要望）: 紐づけ＋報告本文にリンク行、任意でキャプチャも撮って画像として差し込む
+      '<div style="border:1px dashed var(--line-strong);border-radius:6px;padding:6px 8px;margin:0 0 6px">' +
+      (S.selection.length
+        ? '<p style="font-size:11px;margin:0 0 5px" class="sub">' + I.target + " " + selNames + "</p>"
+        : '<p class="faint" style="font-size:10px;margin:0 0 5px">作業したFrameをキャンバスで選択すると、ここから報告に差し込めます</p>') +
+      '<div class="row" style="gap:8px;flex-wrap:wrap">' +
+      '<label style="display:inline-flex;align-items:center;gap:4px;font-size:10px;cursor:pointer"><input type="checkbox" id="rp-cap"' + (S.reportCapture ? " checked" : "") + ' style="width:auto;margin:0">キャプチャも撮って貼る</label>' +
+      '<button class="btn primary sm" id="rp-insert" style="margin-left:auto"' + (S.selection.length && !needKey && !S.reportBusy ? "" : " disabled") + ' title="選択中のFrameをチケットに紐づけ、報告本文にリンク（とキャプチャ）を差し込みます">' + I.link + (S.reportBusy ? "差し込み中…" : "報告に差し込む") + "</button></div>" +
+      (needKey && S.selection.length ? '<p class="faint" style="font-size:10px;margin:5px 0 0">先に上の「Figmaリンク」でこのファイルのURLを追加してください</p>' : "") +
+      "</div>" +
+      '<textarea id="rp-body" placeholder="変更点・対象画面・確認したこと・気になる点（簡潔・事実ベースで）" style="min-height:56px;font-size:11px">' + esc(S.reportDraft && S.reportDraft.seq === t.seq ? S.reportDraft.value : (t.report || "")) + "</textarea>" +
       '<p style="margin:6px 0 0;text-align:right"><button class="btn primary sm" id="rp-save">保存</button></p>' +
       "</div>" +
 
-      '<div class="section"><h2>コメント' + (S.comments ? "（" + S.comments.length + "）" : "") + "</h2>" +
-      (S.comments === null
+      '<div class="section"><h2 class="fold' + (S.commentsOpen ? "" : " closed") + '" id="cm-fold" title="' + (S.commentsOpen ? "スレッドを仕舞う" : "スレッドを開く") + '"><span class="chev">' + I.chev + "</span>コメント" + (S.comments ? "（" + S.comments.length + "）" : "") + "</h2>" +
+      (!S.commentsOpen
+        ? (S.comments && S.comments.length ? '<p class="faint" style="font-size:10px;margin:0 0 4px">' + esc(S.comments[S.comments.length - 1].author) + " ・ " + esc(S.comments[S.comments.length - 1].at) + " が最新</p>" : "")
+        : S.comments === null
         ? '<p class="faint" style="font-size:11px;margin:0">読み込み中…</p>'
         : S.comments.length
-          ? S.comments.map((c) => '<div style="margin-bottom:7px"><span class="faint" style="font-size:10px">' + esc(c.author) + " ・ " + esc(c.at) + "</span>" + md(c.body, captureMap()) + "</div>").join("")
+          ? S.comments.map((c) => {
+              // 長い投稿は先頭だけ見せて「続きを読む」（文字数か行数で判定）
+              const long = c.body.length > 220 || (c.body.match(/\n/g) || []).length >= 5;
+              const open = !!S.expanded[c.id];
+              return '<div style="margin-bottom:7px"><span class="faint" style="font-size:10px">' + esc(c.author) + " ・ " + esc(c.at) + "</span>" +
+                '<div class="' + (long && !open ? "cm-clamp" : "") + '">' + md(c.body, captureMap()) + "</div>" +
+                (long ? '<a class="cm-more" data-id="' + esc(c.id) + '">' + (open ? "折りたたむ" : "続きを読む") + "</a>" : "") + "</div>";
+            }).join("")
           : '<p class="faint" style="font-size:11px;margin:0 0 4px">まだコメントはありません</p>') +
-      '<textarea id="cm-body" placeholder="FBコメントを書く（担当者に通知されます）" style="min-height:44px;font-size:11px;margin-top:4px"></textarea>' +
+      '<textarea id="cm-body" placeholder="FBコメントを書く（担当者に通知されます）" style="min-height:44px;font-size:11px;margin-top:4px">' + esc(S.commentDraft && S.commentDraft.seq === t.seq ? S.commentDraft.value : "") + "</textarea>" +
       '<p style="margin:6px 0 0;text-align:right"><button class="btn primary sm" id="cm-send"' + (S.commentBusy ? " disabled" : "") + ">" + I.send + "送信</button></p>" +
       "</div>" +
       msgHtml());
-    document.getElementById("back").onclick = (e) => { e.preventDefault(); go({ open: null }, "back"); };
     const ed = document.getElementById("edit");
     if (ed) ed.onclick = (e) => { e.preventDefault(); go({ editing: true, msg: null }, "fwd"); };
     const aug = document.getElementById("addurlgo");
@@ -744,7 +793,7 @@
       S.capturing = false;
       S.msg = { t: "ok", text: "キャプチャを記録しています…" };
       render();
-      const ok = await uploadCaptures(t.seq, "manual", sel.map((n) => n.id), label || null);
+      const ok = (await uploadCaptures(t.seq, "manual", sel.map((n) => n.id), label || null)).length;
       S.msg = ok
         ? { t: "ok", text: "キャプチャ" + ok + "件をチケットに貼りました" }
         : { t: "err", text: "キャプチャを記録できませんでした（サイズ超過の可能性）" };
@@ -753,16 +802,61 @@
     };
     const capcancel = document.getElementById("capcancel");
     if (capcancel) capcancel.onclick = () => { S.capturing = false; render(); };
+    const rpCap = document.getElementById("rp-cap");
+    if (rpCap) rpCap.onchange = () => {
+      S.reportCapture = rpCap.checked;
+      parent.postMessage({ pluginMessage: { type: "save-report-capture", value: S.reportCapture } }, "*");
+    };
+    const rpIns = document.getElementById("rp-insert");
+    if (rpIns) rpIns.onclick = async () => {
+      const sel = S.selection.slice();
+      if (!sel.length || S.reportBusy) return;
+      const ta = document.getElementById("rp-body");
+      const draft = { value: ta.value, start: ta.selectionStart, end: ta.selectionEnd };
+      S.reportDraft = { seq: t.seq, value: draft.value }; // 再描画で消えないよう state に退避
+      S.reportBusy = true; S.msg = { t: "ok", text: S.reportCapture ? "紐づけとキャプチャを記録しています…" : "紐づけています…" }; render();
+      try {
+        const urls = sel.map((n) => "https://www.figma.com/design/" + S.fileKey + "/?node-id=" + n.id.replace(":", "-"));
+        const names = sel.map((n) => n.name);
+        await api("POST", null, { action: "attach_frames", seq: t.seq, urls, names });
+        const caps = S.reportCapture ? await uploadCaptures(t.seq, "manual", sel.map((n) => n.id), null) : [];
+        // 報告本文に差し込む行: Frame ごとにリンク行、直後に撮れたキャプチャの画像参照
+        const lines = [];
+        sel.forEach((n, i) => {
+          lines.push("- [" + n.name.replace(/[\[\]]/g, "") + "](" + urls[i] + ")");
+          const c = caps.find((x) => x.nodeId === n.id); // 同名Frameがあっても取り違えない
+          if (c && c.id) lines.push("![" + n.name.replace(/[\[\]]/g, "") + "](capture:" + c.id + ")");
+        });
+        const ins = insertAtCursor(draft.value, draft.start, draft.end, lines.join("\n"));
+        draft.value = ins.value; draft.start = draft.end = ins.cursor;
+        S.reportDraft = { seq: t.seq, value: draft.value };
+        await load(); S.open = t.seq;
+        if (S.reportCapture) loadComments(t.seq); // 差し込んだ画像を同じチケットの添付として解決できるように
+        S.msg = { t: "ok", text: sel.length + "件のFrameを報告に差し込みました" + (S.reportCapture ? "（キャプチャ" + caps.length + "件）" : "") + "。内容を書き足して「保存」してください" };
+        parent.postMessage({ pluginMessage: { type: "notify", message: "報告に差し込みました" } }, "*");
+      } catch (err) { S.msg = { t: "err", text: err.message }; }
+      S.reportBusy = false;
+      render();
+      const ta2 = document.getElementById("rp-body");
+      if (ta2) { ta2.focus(); ta2.setSelectionRange(draft.start, draft.end); }
+    };
+    const rpBody = document.getElementById("rp-body");
+    rpBody.oninput = () => { S.reportDraft = { seq: t.seq, value: rpBody.value }; };
     document.getElementById("rp-save").onclick = async () => {
       const text = document.getElementById("rp-body").value.trim();
       if (!text) { S.msg = { t: "err", text: "作業報告を入力してください" }; render(); return; }
       try {
         const r = await api("POST", null, { action: "save_report", seq: t.seq, report: text });
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        S.reportDraft = null;
         await load(); S.open = t.seq; S.msg = { t: "ok", text: r.message };
       } catch (err) { S.msg = { t: "err", text: err.message }; }
       render();
     };
+    document.getElementById("cm-fold").onclick = () => { S.commentsOpen = !S.commentsOpen; render(); };
+    app.querySelectorAll(".cm-more").forEach((a) => { a.onclick = () => { S.expanded[a.dataset.id] = !S.expanded[a.dataset.id]; render(); }; });
+    const cmBody = document.getElementById("cm-body");
+    cmBody.oninput = () => { S.commentDraft = { seq: t.seq, value: cmBody.value }; };
     document.getElementById("cm-send").onclick = async () => {
       const el = document.getElementById("cm-body");
       const text = el.value.trim();
@@ -771,7 +865,7 @@
       try {
         const r = await api("POST", null, { action: "add_comment", seq: t.seq, body: text });
         parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
-        S.commentBusy = false;
+        S.commentBusy = false; S.commentDraft = null;
         await loadComments(t.seq);
       } catch (err) { S.commentBusy = false; S.msg = { t: "err", text: err.message }; render(); }
     };

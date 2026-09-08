@@ -345,7 +345,14 @@
       const token = document.getElementById("token").value.trim();
       const url = (document.getElementById("url").value || "").trim().replace(/\/+$/, "") || DEFAULT_BASE;
       if (!project || !token) return;
-      if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) { S.msg = { t: "err", text: "接続先は https:// で始まる URL（パスなし）を入力してください" }; render(); return; }
+      if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) {
+        // 入力を消さずにその場でエラーを出す（再描画すると入力欄が空に戻るため）
+        let err = document.getElementById("url-err");
+        if (!err) { err = document.createElement("p"); err.id = "url-err"; err.className = "msg err"; document.getElementById("save").parentElement.after(err); }
+        err.textContent = "接続先は https:// で始まる URL（パスなし）を入力してください";
+        document.querySelector("details").open = true;
+        return;
+      }
       parent.postMessage({ pluginMessage: { type: "save-settings", token, project, url } }, "*");
     };
   }

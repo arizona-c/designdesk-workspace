@@ -182,7 +182,7 @@
 
 <script>
   const app = document.getElementById("app");
-  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", commentsOpen: true, expanded: {}, reportDraft: null, commentDraft: null, reportBusy: false, captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
+  let S = { token: null, project: null, fileKey: null, fileName: "", syncPanel: null, selection: [], data: null, open: null, creating: false, capturing: false, editing: false, msg: null, dir: "fwd", sort: "list", onlyDoing: false, scope: "mine", commentsOpen: true, expanded: {}, reportDraft: null, commentDraft: null, wirePlan: null, toolBusy: false, reportBusy: false, captures: null, compImages: false, comments: null, commentsFor: null, commentBusy: false };
   // 接続先（Design Desk の URL）。既定は Arizona 運営の本番。独立デプロイの組織は設定画面で自組織の URL に変える（clientStorage に保存）
   const DEFAULT_BASE = "https://designdesk.arizona-c.com";
   let BASE = DEFAULT_BASE;
@@ -238,6 +238,40 @@
           parent.postMessage({ pluginMessage: { type: "notify", message: "デザインシステムを同期しました" } }, "*");
         } catch (err) { S.msg = { t: "err", text: err.message }; }
         render();
+      })();
+    } else if (m.type === "wire-progress" || m.type === "mock-progress") {
+      S.msg = { t: "ok", text: "処理中… " + (m.done + 1) + "/" + m.total + "（" + m.page + "）" }; render();
+    } else if (m.type === "wire-inventory-result") {
+      (async () => {
+        if (!m.ok) { S.toolBusy = false; S.msg = { t: "err", text: "棚卸しに失敗しました: " + m.error }; render(); return; }
+        try {
+          const r = await api("POST", null, { action: "wire_inventory", file_key: S.fileKey, file_name: m.fileName, pages: m.pages });
+          S.msg = { t: "ok", text: r.message + "。次は作業フォルダの Claude に「ワイヤーのヒアリングをして」と頼んでください" };
+          parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        } catch (err) { S.msg = { t: "err", text: err.message }; }
+        S.toolBusy = false; render();
+      })();
+    } else if (m.type === "wire-drawn") {
+      (async () => {
+        if (!m.ok) { S.toolBusy = false; S.msg = { t: "err", text: "描画に失敗しました: " + m.error }; render(); return; }
+        const pl = S.wirePlan || { screens: [], transitions: [] };
+        try {
+          const screenNames = {}; pl.screens.forEach((x) => { screenNames[x.id] = x.name; });
+          await api("POST", null, { action: "wire_draw_done", file_key: S.fileKey, page_name: m.pageName, screen_ids: pl.screens.map((x) => x.id), transition_ids: pl.transitions.map((x) => x.id), screen_names: screenNames });
+        } catch (err) { /* 記録の失敗は描画結果に影響しない */ }
+        S.msg = { t: "ok", text: "ページ「" + m.pageName + "」に画面 " + (m.drawn + m.missing) + " 件（Frame から " + m.drawn + "・区画で " + m.missing + "）・遷移 " + m.lines + " 件を描きました" };
+        parent.postMessage({ pluginMessage: { type: "notify", message: "ワイヤーを描きました: " + m.pageName } }, "*");
+        S.wirePlan = null; S.toolBusy = false; render();
+      })();
+    } else if (m.type === "mock-extracted") {
+      (async () => {
+        if (!m.ok) { S.toolBusy = false; S.msg = { t: "err", text: "取り出しに失敗しました: " + m.error }; render(); return; }
+        try {
+          const r = await api("POST", null, { action: "mock_extract", file_key: S.fileKey, samples: m.samples });
+          S.msg = { t: "ok", text: r.message + "。次は作業フォルダの Claude に「モックの知識を学習して」と頼んでください" };
+          parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
+        } catch (err) { S.msg = { t: "err", text: err.message }; }
+        S.toolBusy = false; render();
       })();
     } else if (m.type === "components-progress") {
       S.msg = { t: "ok", text: "読み取り中… " + (m.done + 1) + "/" + m.total + "ページ（" + m.page + "）" }; render();
@@ -518,6 +552,8 @@
               ? item("syncds", I.palette, "デザインシステム同期", "このファイルのCollection（色・余白などの変数）をDesign Deskへ取り込みます（ディレクター用）") +
                 item("synccomp", I.grid, "コンポーネント同期", "このファイルのコンポーネント一覧と使用回数をDesign Deskへ載せます（ディレクター用）")
               : "") +
+            (d.features && d.features.wireframes ? item("wirebtn", I.grid, "ワイヤー生成", "全ページの Frame とプロトタイプ接続を棚卸しし、Design Desk で決めた画面と遷移を新しいページに描きます（AI は使いません）") : "") +
+            (d.features && d.features.mockups ? item("mockbtn", I.pencil, "モックアップ作成", "手本にする画面を選んで、部品・区画・余白・文字・色を Design Desk に取り出します（AI は使いません）") : "") +
             item("connbtn", I.link, "接続設定", "Design Deskとの接続（アクセスキー・プロジェクト）を設定し直します") +
             '<a href="#" id="askcancel" class="faint" style="font-size:10px;display:inline-block;margin-top:8px">閉じる</a>';
         }
@@ -525,6 +561,46 @@
           return '<p style="margin:0;font-weight:bold;font-size:12px">接続設定をやり直す</p>' +
             '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">Design Deskとの接続に使う「アクセスキー」と「プロジェクト」を入れ直す画面に戻ります。接続がうまくいかないときや、別のプロジェクトに切り替えたいときに使ってください。</p>' +
             '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="connconfirm">設定画面へ</button><button class="btn sm" id="askback">戻る</button></div>';
+        }
+        const fileKeyBlock = () => S.fileKey ? "" :
+          '<p style="margin:10px 0 0;font-weight:bold;font-size:11px">はじめに: このファイルの登録（最初の1回だけ）</p>' +
+          '<p class="faint" style="font-size:11px;margin:4px 0 0;line-height:1.6">いま開いている「' + esc(S.fileName) + '」のURLを教えてください（Figma右上の「共有」→「リンクをコピー」）</p>' +
+          '<input id="fileurl2" placeholder="https://www.figma.com/design/…" style="width:100%;font-size:11px;margin-top:8px;box-sizing:border-box">';
+        if (S.syncPanel === "wire") {
+          const pl = S.wirePlan;
+          let h = '<p style="margin:0;font-weight:bold;font-size:12px">ワイヤー生成</p>' +
+            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">既存のページには触りません。描くのは新しく作るページの中だけです。画面のまとめ方と遷移は Design Desk の「ワイヤー生成」（手元の Claude とのヒアリング）で決めます。</p>' +
+            fileKeyBlock() +
+            '<p style="margin:10px 0 0;font-weight:bold;font-size:11px">1. 棚卸し（AI なし）</p>' +
+            '<p class="faint" style="font-size:11px;margin:4px 0 0;line-height:1.6">全ページの Frame（名前・サイズ）とプロトタイプ接続を集めて Design Desk に送ります。ヒアリングの材料になります。</p>' +
+            '<p style="margin:6px 0 0"><button class="btn sm" id="wireinv"' + (S.toolBusy ? " disabled" : "") + '>棚卸しを実行</button></p>' +
+            '<p style="margin:12px 0 0;font-weight:bold;font-size:11px">2. 描く（AI なし）</p>';
+          if (!pl) {
+            h += '<p class="faint" style="font-size:11px;margin:4px 0 0;line-height:1.6">Design Desk に保存された画面と遷移を読み、内容を確認してから新しいページに描きます。</p>' +
+              '<p style="margin:6px 0 0"><button class="btn primary sm" id="wireplan"' + (S.toolBusy ? " disabled" : "") + '>描く準備（内容を確認）</button></p>';
+          } else {
+            const withFrame = pl.screens.filter((x) => (x.states || []).length && (!x.layout || x.layout.source !== "kit")).length;
+            const newIds = pl.last_draw ? pl.screens.filter((x) => !pl.last_draw.screen_ids.includes(x.id)).map((x) => x.id) : [];
+            const removed = pl.last_draw ? pl.last_draw.screen_ids.filter((id) => !pl.screens.some((x) => x.id === id)).length : 0;
+            h += '<p style="font-size:11px;margin:4px 0 0;line-height:1.6">画面 <b>' + pl.screens.length + '</b> 件（Frame から ' + withFrame + '・区画で ' + (pl.screens.length - withFrame) + '）・遷移 <b>' + pl.transitions.length + '</b> 件を描きます。</p>' +
+              (pl.screens.length ? "" : '<p class="msg err" style="margin:6px 0 0">画面がまだありません。先に Design Desk の「ワイヤー生成」で画面を決めてください。</p>') +
+              '<div class="row mt"><input id="wirepage" value="' + esc(pl.pageName) + '" style="flex:1;min-width:120px;font-size:11px;padding:5px 8px" title="新しく作るページの名前"></div>' +
+              (pl.last_draw
+                ? '<label class="faint" style="font-size:11px;display:flex;align-items:flex-start;gap:4px;cursor:pointer;margin-top:8px"><input type="checkbox" id="wirediff" style="width:auto;margin:2px 0 0;accent-color:var(--btn)"' + (pl.diff ? " checked" : "") + '><span>前回の描画「' + esc(pl.last_draw.page_name) + '」との差分を強調する（新しい画面 ' + newIds.length + ' 件に NEW 印・無くなった画面 ' + removed + ' 件を注記）。既定は見比べるだけです</span></label>'
+                : "") +
+              '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="wirego"' + (S.toolBusy || !pl.screens.length ? " disabled" : "") + '>この内容で描く</button><button class="btn sm" id="wireplancancel">やめる</button></div>';
+          }
+          h += '<p style="margin:10px 0 0"><a href="#" id="askback" class="faint" style="font-size:10px">戻る</a></p>';
+          return h;
+        }
+        if (S.syncPanel === "mock") {
+          return '<p style="margin:0;font-weight:bold;font-size:12px">モックアップ作成: 参考デザインの取り出し</p>' +
+            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">手本にする画面（Frame）をキャンバスで選び、部品・区画・余白・文字・色を機械的に集めて Design Desk の「モックアップ作成」に送ります。知識の候補づくりは手元の Claude、採用は人が行います。</p>' +
+            fileKeyBlock() +
+            (S.selection.length
+              ? '<p style="font-size:11px;margin:8px 0 0" class="sub">' + I.target + " " + S.selection.map((n) => esc(n.name)).join(" / ") + "</p>"
+              : '<p class="faint" style="font-size:11px;margin:8px 0 0">手本にする画面を選択してください（複数可）</p>') +
+            '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="mockextract"' + (S.toolBusy || !S.selection.length ? " disabled" : "") + '>取り出す</button><button class="btn sm" id="askback">戻る</button></div>';
         }
         const isDs = S.syncPanel === "ds";
         let h = '<p style="margin:0;font-weight:bold;font-size:12px">' + (isDs ? "デザインシステム同期" : "コンポーネント同期") + "</p>" +
@@ -603,6 +679,62 @@
     };
     const ac = document.getElementById("askcancel");
     if (ac) ac.onclick = (e) => { e.preventDefault(); S.syncPanel = null; render(); };
+    // ---- ワイヤー生成 / モックアップ作成 ----
+    const ensureFileKey = () => {
+      if (S.fileKey) return true;
+      const el = document.getElementById("fileurl2");
+      const m2 = ((el && el.value) || "").match(/figma\.com\/(?:design|file)\/([A-Za-z0-9]+)/);
+      if (!m2) { S.msg = { t: "err", text: "URLからファイルIDを読み取れませんでした。「共有」→「リンクをコピー」で取り直してください" }; render(); return false; }
+      parent.postMessage({ pluginMessage: { type: "save-filekey", fileKey: m2[1] } }, "*");
+      S.fileKey = m2[1];
+      return true;
+    };
+    const wb = document.getElementById("wirebtn");
+    if (wb) wb.onclick = () => { S.syncPanel = "wire"; S.wirePlan = null; S.msg = null; render(); };
+    const mb = document.getElementById("mockbtn");
+    if (mb) mb.onclick = () => { S.syncPanel = "mock"; S.msg = null; render(); };
+    const wi = document.getElementById("wireinv");
+    if (wi) wi.onclick = async () => {
+      if (!ensureFileKey()) return;
+      S.toolBusy = true; S.msg = { t: "ok", text: "設定を読んでいます…" }; render();
+      try {
+        const plan = await api("POST", null, { action: "wire_plan" });
+        S.msg = { t: "ok", text: "全ページを棚卸ししています…" }; render();
+        parent.postMessage({ pluginMessage: { type: "wire-inventory", settings: plan.settings } }, "*");
+      } catch (err) { S.toolBusy = false; S.msg = { t: "err", text: err.message }; render(); }
+    };
+    const wp = document.getElementById("wireplan");
+    if (wp) wp.onclick = async () => {
+      if (!ensureFileKey()) return;
+      S.toolBusy = true; S.msg = { t: "ok", text: "Design Desk の画面と遷移を読んでいます…" }; render();
+      try {
+        const plan = await api("POST", null, { action: "wire_plan" });
+        const d0 = new Date(), pad = (n) => String(n).padStart(2, "0");
+        S.wirePlan = { screens: plan.screens || [], transitions: plan.transitions || [], settings: plan.settings || {}, last_draw: plan.last_draw || null, pageName: "Wire " + d0.getFullYear() + "-" + pad(d0.getMonth() + 1) + "-" + pad(d0.getDate()), diff: false };
+        S.msg = null;
+      } catch (err) { S.msg = { t: "err", text: err.message }; }
+      S.toolBusy = false; render();
+    };
+    const wd = document.getElementById("wirediff");
+    if (wd) wd.onchange = (e) => { if (S.wirePlan) S.wirePlan.diff = e.target.checked; };
+    const wpc = document.getElementById("wireplancancel");
+    if (wpc) wpc.onclick = () => { S.wirePlan = null; render(); };
+    const wg = document.getElementById("wirego");
+    if (wg) wg.onclick = () => {
+      const pl = S.wirePlan; if (!pl) return;
+      const pageName = (document.getElementById("wirepage").value || "").trim() || pl.pageName;
+      pl.pageName = pageName;
+      const highlightIds = pl.diff && pl.last_draw ? pl.screens.filter((x) => !pl.last_draw.screen_ids.includes(x.id)).map((x) => x.id) : [];
+      const removedNames = pl.diff && pl.last_draw ? pl.last_draw.screen_ids.filter((id) => !pl.screens.some((x) => x.id === id)).map((id) => (pl.last_draw.screen_names || {})[id] || "（名前不明）") : [];
+      S.toolBusy = true; S.msg = { t: "ok", text: "新しいページに描いています…" }; render();
+      parent.postMessage({ pluginMessage: { type: "wire-draw", pageName, screens: pl.screens, transitions: pl.transitions, settings: pl.settings, highlightIds, removedNames } }, "*");
+    };
+    const me = document.getElementById("mockextract");
+    if (me) me.onclick = () => {
+      if (!ensureFileKey()) return;
+      S.toolBusy = true; S.msg = { t: "ok", text: "選択した画面から取り出しています…" }; render();
+      parent.postMessage({ pluginMessage: { type: "mock-extract", ids: S.selection.map((n) => n.id) } }, "*");
+    };
   }
 
   function renderCreate() {

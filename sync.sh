@@ -155,7 +155,8 @@ hook_json() {
   local out
   out=$(bash "$0" "$@" 2>/dev/null)
   local esc
-  esc=$(printf '%s' "$out" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'BEGIN{ORS="\\n"} {print}' | sed -e 's/\\n$//')
+  # 日本語（マルチバイト）を sed/awk が落とさないよう LC_ALL=C で処理する
+  esc=$(printf '%s' "$out" | LC_ALL=C sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/  /g' | LC_ALL=C awk 'BEGIN{ORS="\\n"} {print}' | LC_ALL=C sed -e 's/\\n$//')
   if [ -n "$esc" ]; then printf '{"systemMessage":"%s"}\n' "$esc"; else printf '{}\n'; fi
   exit 0
 }

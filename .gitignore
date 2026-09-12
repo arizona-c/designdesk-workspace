@@ -8,3 +8,6 @@ local/
 .claude/.stale-checked
 .claude/.template-synced
 .claude/.sync-headers.tmp
+.codex/config.toml
+.gemini/settings.json
+.agents/

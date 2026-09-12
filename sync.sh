@@ -75,7 +75,7 @@ sync_designdesk() {
     SYNCED_VERSION=$(grep -i '^x-rules-version:' "$hdrs" | tr -dc '0-9')
     echo "${SYNCED_VERSION:-0}" > .claude/.synced-version
     # この同期成功の瞬間、Design Desk側のサイドバーの連携チップも🟢になる（last_used_at更新）
-    echo "🔗 Design Desk と連携しました（プロジェクト: $DESIGNDESK_PROJECT）— Web側サイドバーの連携表示も点灯します"
+    echo "🔗 Design Desk と連携しました（プロジェクト: ${DESIGNDESK_PROJECT}）— Web側サイドバーの連携表示も点灯します"
     echo "✅ 最新ルールを同期しました（$(head -1 .claude/designdesk-rules.md | sed 's/# //')）"
     # 起動サマリ: 自分の進行中チケットとAIレビュー待機（ヘッダーから取得）
     local my pend

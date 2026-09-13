@@ -263,8 +263,9 @@
               failedCaps += batch.length - images.length;
             }
           }
-          const capNote = m.scope === "all" ? "" : "。キャプチャ " + sentCaps + " 枚を送りました" + (failedCaps ? "（" + failedCaps + " 枚は書き出せず・Design Desk の画面カードから撮り直せます）" : "");
-          S.msg = { t: "ok", text: r.message + capNote + "。次は Design Desk の「デザイン定義 › 画面」を開き、「Figma から取り込む」で画面として登録してください（手元の AI に「画面のヒアリングをして」と頼むこともできます）" };
+          const capNote = m.scope === "all" ? "" : "キャプチャ " + sentCaps + " 枚を送りました" + (failedCaps ? "（" + failedCaps + " 枚は書き出せず・Design Desk の画面カードから撮り直せます）" : "");
+          S.msg = null;
+          S.invResult = { message: r.message, capNote, newCount: m.scope === "all" ? -1 : Number(r.new_count) || 0, registeredCount: Number(r.registered_count) || 0 };
           parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         } catch (err) { S.msg = { t: "err", text: err.message }; }
         S.toolBusy = false; render();
@@ -601,6 +602,18 @@
               '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="wirescope" value="all" style="width:auto;margin:0;accent-color:var(--btn)"' + (S.wireScope === "all" ? " checked" : "") + '><span>全ページ（差分確認用・渡す対象の印は保たれます）</span></label>' +
             '</div>' +
             '<p style="margin:8px 0 0"><button class="btn primary sm" id="wireinv"' + (S.toolBusy ? " disabled" : "") + '>Design Desk に送る</button></p>' +
+            // 送信結果は消えない形で残す（#69）: 未登録 / 登録済みの内訳と、次の一手（Design Desk の「画面」で取り込む）
+            (S.invResult ? '<div style="margin:10px 0 0;border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--surface);font-size:11px;line-height:1.6">' +
+                '<p style="margin:0;font-weight:bold">' + esc(S.invResult.message) + '</p>' +
+                (S.invResult.capNote ? '<p class="faint" style="margin:2px 0 0;font-size:10px">' + esc(S.invResult.capNote) + '</p>' : "") +
+                (S.invResult.newCount > 0
+                  ? '<p class="faint" style="margin:4px 0 0;font-size:10px">未登録の Frame は、Design Desk の「画面」で「できあがる形」を見てから画面にします（手元の AI に「画面のヒアリングをして」と頼むこともできます）。</p>' +
+                    '<p style="margin:6px 0 0"><button class="btn primary sm" id="invopen">Design Desk の「画面」で取り込む</button></p>'
+                  : (S.invResult.newCount === 0 && S.invResult.registeredCount > 0
+                    ? '<p class="faint" style="margin:4px 0 0;font-size:10px">登録済みの画面はタイルに増えません。キャプチャは最新のものに置き換わっています。</p>' +
+                      '<p style="margin:6px 0 0"><button class="btn sm" id="invopen">Design Desk の「画面」を開く</button></p>'
+                    : "")) +
+              '</div>' : "") +
             '<p style="margin:10px 0 0"><a href="#" id="askback" class="faint" style="font-size:10px">戻る</a></p>';
         }
         if (S.syncPanel === "wire") {
@@ -725,7 +738,9 @@
       return true;
     };
     const sb = document.getElementById("screensbtn");
-    if (sb) sb.onclick = () => { S.syncPanel = "screens"; S.msg = null; render(); };
+    if (sb) sb.onclick = () => { S.syncPanel = "screens"; S.msg = null; S.invResult = null; render(); };
+    const io = document.getElementById("invopen");
+    if (io) io.onclick = () => window.open(BASE + "/" + encodeURIComponent(S.project) + "/registry/map?import=1", "_blank");
     const wb = document.getElementById("wirebtn");
     if (wb) wb.onclick = () => { S.syncPanel = "wire"; S.wirePlan = null; S.msg = null; render(); };
     const mb = document.getElementById("mockbtn");

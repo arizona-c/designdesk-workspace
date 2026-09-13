@@ -286,7 +286,29 @@ async function wireInventory(msg) {
   const minW = typeof st.minFrameWidth === "number" ? st.minFrameWidth : 240;
   const prefixes = st.ignorePrefixes || [];
   const isFrameLike = (n) => n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE";
-  const frameOf = (n) => ({ node_id: n.id, name: n.name, width: Math.round(n.width), height: Math.round(n.height), links: reactionTargets(n) });
+  // 人に選ばせずに機械的に取れる情報も送る（2026-09-13 オーナー決定）: 種類・親の並び（Section › Section › Frame の入れ子）・画面名の候補（中の一番大きい文字）。
+  // Design Desk 側はこれで画面グループと画面の下書きを組み立てる。Figma は変えない
+  const parentsOf = (n) => {
+    const out = [];
+    let p = n.parent;
+    while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") { out.unshift({ id: p.id, name: p.name, type: p.type }); p = p.parent; }
+    return out;
+  };
+  const titleOf = (n) => {
+    try {
+      if (n.width < minW || !("findAllWithCriteria" in n)) return "";
+      const texts = n.findAllWithCriteria({ types: ["TEXT"] }).slice(0, 300);
+      let best = null, bestSize = 0;
+      for (const t of texts) {
+        const chars = (t.characters || "").trim().replace(/\s+/g, " ");
+        if (!chars || chars.length > 40 || t.visible === false) continue;
+        const size = typeof t.fontSize === "number" ? t.fontSize : 0;
+        if (size > bestSize) { bestSize = size; best = chars; }
+      }
+      return best || "";
+    } catch (e) { return ""; }
+  };
+  const frameOf = (n) => ({ node_id: n.id, name: n.name, type: n.type, width: Math.round(n.width), height: Math.round(n.height), links: reactionTargets(n), parents: parentsOf(n), title: titleOf(n) });
   const collect = (nodes, out, strict) => {
     for (const n of nodes) {
       if (n.type === "SECTION") { collect(n.children, out, strict); continue; }

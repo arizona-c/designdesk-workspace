@@ -594,7 +594,8 @@
         if (S.syncPanel === "screens") {
           const sc = S.wireScope || (S.selection.length ? "selection" : "page");
           return '<p style="margin:0;font-weight:bold;font-size:12px">画面: Frame を Design Desk に送る</p>' +
-            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">開発に渡す Frame や Section をキャンバスで選び、Design Desk に送ります（名前・サイズ・プロトタイプ接続だけ。Figma は変えません）。何回かに分けて送れます。送ったあとは Design Desk の「デザイン定義 › 画面」を開き、「Figma から取り込む」で画面として登録するか、手元の AI にヒアリングを頼みます。</p>' +
+            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">開発に渡す Frame や Section をキャンバスで選び、Design Desk に送ります（名前・サイズ・プロトタイプ接続・キャプチャ。Figma は変えません）。何回かに分けて送れます。送ったあとは Design Desk の「デザイン定義 › 画面」の受信箱で、置く・状態にする・非表示にする、で仕分けます。</p>' +
+            (d.screen_import_prefix ? '<p style="font-size:11px;margin:6px 0 0;line-height:1.6;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">この案件の取り込む接頭辞は <b>' + esc(d.screen_import_prefix) + '</b> です。この接頭辞で始まる Frame（例: ' + esc(d.screen_import_prefix) + 'ホーム）は、送るだけで Design Desk に画面として置かれます（受信箱を通しません。名前は接頭辞の後ろ）。</p>' : "") +
             fileKeyBlock() +
             '<div style="margin:10px 0 0;font-size:11px;line-height:1.8">' +
               '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="wirescope" value="selection" style="width:auto;margin:0;accent-color:var(--btn)"' + (sc === "selection" ? " checked" : "") + '><span>選択中の Frame / Section だけ' + (S.selection.length ? '（' + S.selection.length + ' 件選択中）' : '（何も選んでいません）') + '</span></label>' +

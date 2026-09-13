@@ -246,7 +246,25 @@
         if (!m.ok) { S.toolBusy = false; S.msg = { t: "err", text: "送信に失敗しました: " + m.error }; render(); return; }
         try {
           const r = await api("POST", null, { action: "wire_inventory", file_key: S.fileKey, file_name: m.fileName, pages: m.pages, mode: m.scope === "all" ? "replace" : "merge" });
-          S.msg = { t: "ok", text: r.message + "。次は Design Desk の「デザイン定義 › 画面」を開き、「Figma から取り込む」で画面として登録してください（手元の AI に「画面のヒアリングをして」と頼むこともできます）" };
+          // キャプチャも一緒に送る（#68・オーナー決定）: Figma の中で書き出せるので一瞬で、Design Desk 側の読み取りトークンも要らない。
+          // 「全ページ」は差分確認用なので送らない。1 枚ずつ小さく（幅 640px）・失敗は数えるだけで止めない
+          let sentCaps = 0, failedCaps = 0;
+          if (m.scope !== "all") {
+            const frames = [].concat.apply([], m.pages.map((p) => p.frames)).slice(0, 300);
+            for (let i = 0; i < frames.length; i += 10) {
+              const batch = frames.slice(i, i + 10);
+              S.msg = { t: "ok", text: "キャプチャを送っています… " + Math.min(frames.length, i + batch.length) + "/" + frames.length }; render();
+              const images = await exportNodes(batch.map((f) => f.node_id), 640);
+              for (const img of images) {
+                const f = batch.find((x) => x.node_id === img.id);
+                try { await api("POST", null, { action: "screen_capture", file_key: S.fileKey, node_id: img.id, data: img.data, width: f && f.width, height: f && f.height }); sentCaps++; }
+                catch (e) { failedCaps++; }
+              }
+              failedCaps += batch.length - images.length;
+            }
+          }
+          const capNote = m.scope === "all" ? "" : "。キャプチャ " + sentCaps + " 枚を送りました" + (failedCaps ? "（" + failedCaps + " 枚は書き出せず・Design Desk の画面カードから撮り直せます）" : "");
+          S.msg = { t: "ok", text: r.message + capNote + "。次は Design Desk の「デザイン定義 › 画面」を開き、「Figma から取り込む」で画面として登録してください（手元の AI に「画面のヒアリングをして」と頼むこともできます）" };
           parent.postMessage({ pluginMessage: { type: "notify", message: r.message } }, "*");
         } catch (err) { S.msg = { t: "err", text: err.message }; }
         S.toolBusy = false; render();

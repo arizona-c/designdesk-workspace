@@ -279,29 +279,52 @@ function reactionTargets(node) {
 }
 
 async function wireInventory(msg) {
+  // 範囲（#61）: selection=選択中の Frame / Section だけ（Section は中の最上位 Frame を展開）/ page=今のページ / all=全ページ。
+  // selection・page は「渡す対象」として Design Desk に足し込まれ、all は差分確認用の全体（既存の渡す対象の印は保たれる）
   const st = msg.settings || {};
+  const scope = msg.scope || "all";
   const minW = typeof st.minFrameWidth === "number" ? st.minFrameWidth : 240;
   const prefixes = st.ignorePrefixes || [];
-  await figma.loadAllPagesAsync();
+  const isFrameLike = (n) => n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE";
+  const frameOf = (n) => ({ node_id: n.id, name: n.name, width: Math.round(n.width), height: Math.round(n.height), links: reactionTargets(n) });
+  const collect = (nodes, out, strict) => {
+    for (const n of nodes) {
+      if (n.type === "SECTION") { collect(n.children, out, strict); continue; }
+      if (!isFrameLike(n)) continue;
+      if (strict && (n.width < minW || nameIgnored(n.name, prefixes))) continue;
+      out.push(frameOf(n));
+    }
+  };
   const pages = [];
-  const all = figma.root.children;
-  for (let i = 0; i < all.length; i++) {
-    const page = all[i];
-    figma.ui.postMessage({ type: "wire-progress", done: i, total: all.length, page: page.name });
-    if (nameIgnored(page.name, prefixes)) continue;
+  if (scope === "selection") {
+    const sel = figma.currentPage.selection;
+    if (!sel.length) { figma.ui.postMessage({ type: "wire-inventory-result", ok: false, error: "Frame か Section を選んでください（複数可）" }); return; }
     const frames = [];
-    const walk = (nodes) => {
-      for (const n of nodes) {
-        if (n.type === "SECTION") { walk(n.children); continue; }
-        if (n.type !== "FRAME" && n.type !== "COMPONENT" && n.type !== "INSTANCE") continue;
-        if (n.width < minW || nameIgnored(n.name, prefixes)) continue;
-        frames.push({ node_id: n.id, name: n.name, width: Math.round(n.width), height: Math.round(n.height), links: reactionTargets(n) });
-      }
-    };
-    walk(page.children);
-    pages.push({ name: page.name, frames });
+    for (const n of sel) {
+      if (n.type === "SECTION") collect(n.children, frames, false);
+      else if (isFrameLike(n)) frames.push(frameOf(n));
+      else if ("children" in n) collect(n.children, frames, false);
+    }
+    // 同じ Frame を二重に選んでいても 1 件
+    const seen = new Set();
+    pages.push({ name: figma.currentPage.name, frames: frames.filter((f) => (seen.has(f.node_id) ? false : (seen.add(f.node_id), true))) });
+  } else if (scope === "page") {
+    const frames = [];
+    collect(figma.currentPage.children, frames, true);
+    pages.push({ name: figma.currentPage.name, frames });
+  } else {
+    await figma.loadAllPagesAsync();
+    const all = figma.root.children;
+    for (let i = 0; i < all.length; i++) {
+      const page = all[i];
+      figma.ui.postMessage({ type: "wire-progress", done: i, total: all.length, page: page.name });
+      if (nameIgnored(page.name, prefixes)) continue;
+      const frames = [];
+      collect(page.children, frames, true);
+      pages.push({ name: page.name, frames });
+    }
   }
-  figma.ui.postMessage({ type: "wire-inventory-result", ok: true, fileName: figma.root.name, pages });
+  figma.ui.postMessage({ type: "wire-inventory-result", ok: true, fileName: figma.root.name, pages, scope });
 }
 
 // ---- 描画 ----

@@ -11,3 +11,4 @@ local/
 .codex/config.toml
 .gemini/settings.json
 .agents/
+.DS_Store

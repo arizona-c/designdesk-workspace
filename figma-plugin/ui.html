@@ -571,10 +571,9 @@
           return '<p style="margin:0;font-weight:bold;font-size:12px">設定</p>' +
             head("デザイン定義") +
             item("screensbtn", I.grid, "サイトマップ: Frame を Design Desk に送る", "開発に渡す Frame や Section を選んで送ります。Design Desk の「デザイン定義 › サイトマップ」で画面として整理します（AI は使いません・Figma は変えません）") +
-            (d.can_sync_ds
-              ? item("syncds", I.palette, "デザインシステム: Collection の同期", "このファイルのCollection（色・余白などの変数）をDesign Deskへ取り込みます（ディレクター用）") +
-                item("synccomp", I.grid, "コンポーネント: 一覧と使用回数の同期", "このファイルのコンポーネント一覧と使用回数をDesign Deskへ載せます（ディレクター用）")
-              : "") +
+            (d.can_sync_ds ? item("syncds", I.palette, "デザインシステム: Collection の同期", "このファイルのCollection（色・余白などの変数）をDesign Deskへ取り込みます（ディレクター用）") : "") +
+            // コンポーネント同期は書き手（デザイナー以上）。Web の「手元のClaudeで同期」の依頼と同じ（2026-09-25）。旧サーバーは can_sync_components を返さないので can_sync_ds で代える
+            ((d.can_sync_components ?? d.can_sync_ds) ? item("synccomp", I.grid, "コンポーネント: 一覧と使用回数の同期", "このファイルのコンポーネント一覧と使用回数をDesign Deskへ載せます") : "") +
             (d.features && (d.features.wireframes || d.features.mockups) ? head("AIでつくる") : "") +
             (d.features && d.features.wireframes ? item("wirebtn", I.grid, "ワイヤー: 決めた画面を新しいページに描く", "Design Desk の「サイトマップ」で決めた画面と遷移を、新しいページに簡略ワイヤーとして描きます（AI は使いません・既存のページには触れません）") : "") +
             (d.features && d.features.mockups ? item("mockbtn", I.pencil, "モックアップ: 手本の取り出し", "手本にする画面を選んで、部品・区画・余白・文字・色を Design Desk に取り出します（AI は使いません）") : "") +

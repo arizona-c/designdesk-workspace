@@ -235,6 +235,15 @@ figma.ui.onmessage = async (msg) => {
     try { await wireDraw(msg); } catch (e) { figma.ui.postMessage({ type: "wire-drawn", ok: false, error: String(e) }); }
   } else if (msg.type === "mock-extract") {
     try { await mockExtract(msg); } catch (e) { figma.ui.postMessage({ type: "mock-extracted", ok: false, error: String(e) }); }
+  } else if (msg.type === "auto-check") {
+    // 自動チェック（#16）: 選んだ Frame の中だけを決まった検査で調べる（AI なし・読むだけで何も変えない）。
+    // 種類は Design Desk のルールに結んだものだけ（msg.kinds）。例は種類ごとに 5 件まで
+    try {
+      const result = await runAutoCheck(msg.ids || [], msg.kinds || []);
+      figma.ui.postMessage({ type: "auto-check-result", requestId: msg.requestId, result });
+    } catch (e) {
+      figma.ui.postMessage({ type: "auto-check-result", requestId: msg.requestId, error: String((e && e.message) || e) });
+    }
   } else if (msg.type === "goto-node") {
     // 同一ファイル内なら該当ノードへジャンプ（ページ切替+スクロール&ズーム+選択）
     try {
@@ -252,6 +261,51 @@ figma.ui.onmessage = async (msg) => {
     }
   }
 };
+
+// ==== 自動チェック（#16）====
+// 種類と「要確認」の決まりは Design Desk の src/lib/auto-check.ts（AUTO_CHECKS）と同じ。ここを変えたらあちらの説明も直す
+const DEFAULT_LAYER_NAME_RE = /^(Frame|Group|Vector|Rectangle|Ellipse|Line|Polygon|Star|Text|Section|Image) \d+$/;
+const AUTO_CHECK_SAMPLES = 5;
+const AUTO_CHECK_MAX_NODES = 30000; // 選んだ範囲が巨大でも固まらない上限
+
+function hasUnboundSolid(paints) {
+  if (!Array.isArray(paints)) return false; // figma.mixed（文字ごとに違う塗り）は数えない
+  return paints.some((p) => p && p.type === "SOLID" && p.visible !== false && !(p.boundVariables && p.boundVariables.color));
+}
+
+async function runAutoCheck(ids, kinds) {
+  const want = new Set(kinds);
+  const found = {};
+  kinds.forEach((k) => { found[k] = { kind: k, count: 0, samples: [] }; });
+  const hit = (k, node) => {
+    const f = found[k];
+    f.count++;
+    if (f.samples.length < AUTO_CHECK_SAMPLES) f.samples.push({ nodeId: node.id, name: node.name });
+  };
+  const scope = [];
+  let nodeCount = 0;
+  const visit = (node, top) => {
+    if (nodeCount >= AUTO_CHECK_MAX_NODES) return;
+    nodeCount++;
+    if (want.has("default_layer_name") && !top && DEFAULT_LAYER_NAME_RE.test(node.name)) hit("default_layer_name", node);
+    if (want.has("hex_color")) {
+      // スタイル（塗り・線）が当たっていれば直打ちではない
+      const fillStyled = "fillStyleId" in node && node.fillStyleId && node.fillStyleId !== figma.mixed;
+      const strokeStyled = "strokeStyleId" in node && node.strokeStyleId;
+      if (("fills" in node && !fillStyled && hasUnboundSolid(node.fills)) || ("strokes" in node && !strokeStyled && hasUnboundSolid(node.strokes))) hit("hex_color", node);
+    }
+    // インスタンスの中は部品側の問題なので数えない（インスタンス自体は見る）
+    if (node.type === "INSTANCE") return;
+    if ("children" in node) for (const c of node.children) visit(c, false);
+  };
+  for (const id of ids) {
+    const node = await figma.getNodeByIdAsync(id);
+    if (!node || node.type === "PAGE" || node.type === "DOCUMENT") continue;
+    scope.push({ nodeId: node.id, name: node.name });
+    visit(node, true);
+  }
+  return { scope, nodeCount, truncated: nodeCount >= AUTO_CHECK_MAX_NODES, findings: kinds.map((k) => found[k]) };
+}
 
 // ==== ワイヤー生成（#36 棚卸し / #38 描画）・モックアップ作成（#44 取り出し）====
 // 原則: 既存ページ・既存ノードは読むだけで一切変更しない。描くのは新しく作ったページの中だけ。AI は使わない（決定的な処理）

@@ -67,7 +67,7 @@ Design Desk のチケット操作ツール（mcp__designdesk__…）が見当た
   - **提出（save_report・レビュー列への移動）には synced_rules_version が必要** —
     .claude/designdesk-rules.md 冒頭の「同期済みルールバージョン」の数値を渡す。
     「古い」と拒否されたら `bash sync.sh` → ルール再読 → 再実行
-- **Design Deskの使い方案内**: 同期ファイル内の「Design Deskの使い方」FAQを根拠に、
+- **Design Deskの使い方案内**: `get_app_help`（MCP）で使い方FAQを読み、それを根拠に
   画面操作の質問（検品タグ・トークン・プラグイン導入等）へ正確に答える。FAQに無いことは
   想像で答えず「画面右下のボタンから開発チームに質問できます」と案内する
 - **レビュー準備**: チケットに載せる作業報告文（report）づくり — 簡潔・事実ベース・末尾に対象のFigma URL

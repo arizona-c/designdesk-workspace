@@ -1,4 +1,5 @@
 # Design Desk Workspace（Gemini CLI 用の入口）
+<!-- このファイルは毎回 AI に全部読まれる。目安 4,000 字まで。場面ごとの作法は Design Desk の get_workflow、案件のことは同期ファイルへ（2026-09-26・Design Desk #109） -->
 
 このファイルは Google Gemini CLI 向けの指示です。Claude Code は `CLAUDE.md`、Codex CLI は `AGENTS.md` を読みます。内容は同じ趣旨で、案件ルールの正本は共通の `.claude/designdesk-rules.md` です。
 

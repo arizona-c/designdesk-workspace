@@ -1,4 +1,5 @@
 # Design Desk Workspace
+<!-- このファイルは毎回 AI に全部読まれる。目安 4,000 字まで。場面ごとの作法は Design Desk の get_workflow、案件のことは同期ファイルへ（2026-09-26・Design Desk #109） -->
 
 ## 起動時にまず行うこと（最優先・毎回）
 

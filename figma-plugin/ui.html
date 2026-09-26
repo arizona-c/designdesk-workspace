@@ -579,11 +579,11 @@
         if (S.syncPanel === "menu") {
           const item = (id, icon, title, desc) =>
             '<button class="btn" id="' + id + '" style="display:flex;width:100%;text-align:left;align-items:flex-start;gap:6px;margin-top:6px;padding:8px 10px"><span style="margin-top:2px">' + icon + '</span><span><b style="font-size:12px">' + title + '</b><br><span class="faint" style="font-size:10px;line-height:1.5">' + desc + "</span></span></button>";
-          // 見出しと名前は Design Desk の左ナビ（AI共有情報 › デザイン定義 › サイトマップ / デザインシステム / コンポーネント）に揃える（2026-09-13 オーナー指摘）。「AIでつくる」（ワイヤー / モックアップ）は 2026-09-26 から機能ごと止めていて、サーバーが false を返すので出ない
+          // 見出しと名前は Design Desk の左ナビ（AI共有情報 › Figma › サイトマップ / デザインシステム / コンポーネント）に揃える（2026-09-13 オーナー指摘・2026-09-26 に「デザイン定義」の見出しをやめた）。「AIでつくる」（ワイヤー / モックアップ）は 2026-09-26 から機能ごと止めていて、サーバーが false を返すので出ない
           const head = (t) => '<p class="faint" style="margin:10px 0 0;font-size:10px;font-weight:bold;letter-spacing:.02em">' + t + "</p>";
           return '<p style="margin:0;font-weight:bold;font-size:12px">設定</p>' +
-            head("デザイン定義") +
-            item("screensbtn", I.grid, "サイトマップ: Frame を Design Desk に送る", "開発に渡す Frame や Section を選んで送ります。Design Desk の「デザイン定義 › サイトマップ」で画面として整理します（AI は使いません・Figma は変えません）") +
+            head("AI共有情報") +
+            item("screensbtn", I.grid, "サイトマップ: Frame を Design Desk に送る", "開発に渡す Frame や Section を選んで送ります。Design Desk の「サイトマップ」で画面として整理します（AI は使いません・Figma は変えません）") +
             (d.can_sync_ds ? item("syncds", I.palette, "デザインシステム: Collection の同期", "このファイルのCollection（色・余白などの変数）をDesign Deskへ取り込みます（ディレクター用）") : "") +
             // コンポーネント同期は書き手（デザイナー以上）。Web の「手元のClaudeで同期」の依頼と同じ（2026-09-25）。旧サーバーは can_sync_components を返さないので can_sync_ds で代える
             ((d.can_sync_components ?? d.can_sync_ds) ? item("synccomp", I.grid, "コンポーネント: 一覧と使用回数の同期", "このファイルのコンポーネント一覧と使用回数をDesign Deskへ載せます") : "") +
@@ -606,7 +606,7 @@
         if (S.syncPanel === "screens") {
           const sc = S.wireScope || (S.selection.length ? "selection" : "page");
           return '<p style="margin:0;font-weight:bold;font-size:12px">サイトマップ: Frame を Design Desk に送る</p>' +
-            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">開発に渡す Frame や Section をキャンバスで選び、Design Desk に送ります（名前・サイズ・プロトタイプ接続・キャプチャ。Figma は変えません）。何回かに分けて送れます。送ったあとは Design Desk の「デザイン定義 › サイトマップ」の受信箱で、置く・状態にする・非表示にする、で仕分けます。</p>' +
+            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">開発に渡す Frame や Section をキャンバスで選び、Design Desk に送ります（名前・サイズ・プロトタイプ接続・キャプチャ。Figma は変えません）。何回かに分けて送れます。送ったあとは Design Desk の「サイトマップ」の受信箱で、置く・状態にする・非表示にする、で仕分けます。</p>' +
             (d.screen_import_prefix ? '<p style="font-size:11px;margin:6px 0 0;line-height:1.6;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">この案件の取り込む接頭辞は <b>' + esc(d.screen_import_prefix) + '</b> です。この接頭辞で始まる Frame（例: ' + esc(d.screen_import_prefix) + 'ホーム）は、送るだけで Design Desk に画面として置かれます（受信箱を通しません。名前は接頭辞の後ろ）。</p>' : "") +
             fileKeyBlock() +
             '<div style="margin:10px 0 0;font-size:11px;line-height:1.8">' +
@@ -632,7 +632,7 @@
         if (S.syncPanel === "wire") {
           const pl = S.wirePlan;
           let h = '<p style="margin:0;font-weight:bold;font-size:12px">ワイヤー: 決めた画面を新しいページに描く</p>' +
-            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">既存のページには触りません。描くのは新しく作るページの中だけです。画面と遷移は Design Desk の「デザイン定義 › サイトマップ」で決めます（Frame を送るのは 設定 → 画面 から）。</p>' +
+            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">既存のページには触りません。描くのは新しく作るページの中だけです。画面と遷移は Design Desk の「サイトマップ」で決めます（Frame を送るのは 設定 → 画面 から）。</p>' +
             fileKeyBlock() +
             '<p style="margin:10px 0 0;font-weight:bold;font-size:11px">描く（AI なし）</p>' +
             "";
@@ -644,7 +644,7 @@
             const newIds = pl.last_draw ? pl.screens.filter((x) => !pl.last_draw.screen_ids.includes(x.id)).map((x) => x.id) : [];
             const removed = pl.last_draw ? pl.last_draw.screen_ids.filter((id) => !pl.screens.some((x) => x.id === id)).length : 0;
             h += '<p style="font-size:11px;margin:4px 0 0;line-height:1.6">画面 <b>' + pl.screens.length + '</b> 件（Frame から ' + withFrame + '・区画で ' + (pl.screens.length - withFrame) + '）・遷移 <b>' + pl.transitions.length + '</b> 件を描きます。</p>' +
-              (pl.screens.length ? "" : '<p class="msg err" style="margin:6px 0 0">画面がまだありません。先に Design Desk の「デザイン定義 › サイトマップ」で画面を決めてください。</p>') +
+              (pl.screens.length ? "" : '<p class="msg err" style="margin:6px 0 0">画面がまだありません。先に Design Desk の「サイトマップ」で画面を決めてください。</p>') +
               '<div class="row mt"><input id="wirepage" value="' + esc(pl.pageName) + '" style="flex:1;min-width:120px;font-size:11px;padding:5px 8px" title="新しく作るページの名前"></div>' +
               (pl.last_draw
                 ? '<label class="faint" style="font-size:11px;display:flex;align-items:flex-start;gap:4px;cursor:pointer;margin-top:8px"><input type="checkbox" id="wirediff" style="width:auto;margin:2px 0 0;accent-color:var(--btn)"' + (pl.diff ? " checked" : "") + '><span>前回の描画「' + esc(pl.last_draw.page_name) + '」との差分を強調する（新しい画面 ' + newIds.length + ' 件に NEW 印・無くなった画面 ' + removed + ' 件を注記）。既定は見比べるだけです</span></label>'

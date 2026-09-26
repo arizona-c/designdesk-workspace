@@ -6,7 +6,7 @@ Figma の中から、自分のチケットの確認・選択中 Frame の紐づ�
 
 ### A. Figma Community から（公開後・審査済み版）
 1. Figma で Plugins → 「Design Desk」を検索して実行
-2. 初回に、プロジェクトID（例: app-dev）と、プラグイン用に発行した個人アクセストークン（Design Desk のアカウントメニュー → アクセストークン）を入力
+2. 初回に、プロジェクトID（例: app-dev）と、プラグイン用に発行した個人アクセストークン（Design Desk のアカウントメニュー → 接続 → Figma プラグイン）を入力
 3. 自社環境に Design Desk を設置している組織は「接続先を変更」を開いて自社の URL を入力（既定は designdesk.arizona-c.com）
 
 ### B. 開発版として読み込む（審査を待たずに最新を使う・従来どおり）

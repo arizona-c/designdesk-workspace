@@ -508,7 +508,7 @@
   function renderSetup() {
     app.innerHTML = viewWrap(
       "<h1>アカウントにつなぐ</h1>" +
-      '<p class="sub">Design Desk のアカウントメニュー →「アクセストークン」で発行した dd_pat_… を貼り付けてください。</p>' +
+      '<p class="sub">Design Desk のアカウントメニュー →「接続」→「Figma プラグイン」で発行した dd_pat_… を貼り付けてください。</p>' +
       '<div class="mt"><input id="project" placeholder="プロジェクトID（ディレクターから聞いた名前。例: app-dev）" value="' + esc(S.project || "") + '"></div>' +
       '<div class="mt"><input id="token" type="password" placeholder="dd_pat_…"></div>' +
       '<details class="mt"' + (BASE !== DEFAULT_BASE ? " open" : "") + '><summary class="sub">接続先を変更（自社環境に Design Desk を設置している組織のみ）</summary>' +
@@ -579,7 +579,7 @@
         if (S.syncPanel === "menu") {
           const item = (id, icon, title, desc) =>
             '<button class="btn" id="' + id + '" style="display:flex;width:100%;text-align:left;align-items:flex-start;gap:6px;margin-top:6px;padding:8px 10px"><span style="margin-top:2px">' + icon + '</span><span><b style="font-size:12px">' + title + '</b><br><span class="faint" style="font-size:10px;line-height:1.5">' + desc + "</span></span></button>";
-          // 見出しと名前は Design Desk の左ナビ（デザイン定義 › サイトマップ / デザインシステム / コンポーネント、AIでつくる › ワイヤー / モックアップ）に揃える（2026-09-13 オーナー指摘）
+          // 見出しと名前は Design Desk の左ナビ（AI共有情報 › デザイン定義 › サイトマップ / デザインシステム / コンポーネント）に揃える（2026-09-13 オーナー指摘）。「AIでつくる」（ワイヤー / モックアップ）は 2026-09-26 から機能ごと止めていて、サーバーが false を返すので出ない
           const head = (t) => '<p class="faint" style="margin:10px 0 0;font-size:10px;font-weight:bold;letter-spacing:.02em">' + t + "</p>";
           return '<p style="margin:0;font-weight:bold;font-size:12px">設定</p>' +
             head("デザイン定義") +
@@ -591,12 +591,12 @@
             (d.features && d.features.wireframes ? item("wirebtn", I.grid, "ワイヤー: 決めた画面を新しいページに描く", "Design Desk の「サイトマップ」で決めた画面と遷移を、新しいページに簡略ワイヤーとして描きます（AI は使いません・既存のページには触れません）") : "") +
             (d.features && d.features.mockups ? item("mockbtn", I.pencil, "モックアップ: 手本の取り出し", "手本にする画面を選んで、部品・区画・余白・文字・色を Design Desk に取り出します（AI は使いません）") : "") +
             head("接続") +
-            item("connbtn", I.link, "接続設定", "Design Deskとの接続（アクセスキー・プロジェクト）を設定し直します") +
+            item("connbtn", I.link, "接続設定", "Design Deskとの接続（アクセストークン・プロジェクト）を設定し直します") +
             '<a href="#" id="askcancel" class="faint" style="font-size:10px;display:inline-block;margin-top:8px">閉じる</a>';
         }
         if (S.syncPanel === "conn") {
           return '<p style="margin:0;font-weight:bold;font-size:12px">接続設定をやり直す</p>' +
-            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">Design Deskとの接続に使う「アクセスキー」と「プロジェクト」を入れ直す画面に戻ります。接続がうまくいかないときや、別のプロジェクトに切り替えたいときに使ってください。</p>' +
+            '<p class="faint" style="font-size:11px;margin:6px 0 0;line-height:1.6">Design Deskとの接続に使う「アクセストークン」と「プロジェクト」を入れ直す画面に戻ります。接続がうまくいかないときや、別のプロジェクトに切り替えたいときに使ってください。</p>' +
             '<div class="row" style="gap:5px;margin-top:8px"><button class="btn primary sm" id="connconfirm">設定画面へ</button><button class="btn sm" id="askback">戻る</button></div>';
         }
         const fileKeyBlock = () => S.fileKey ? "" :

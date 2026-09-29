@@ -579,10 +579,10 @@
         if (S.syncPanel === "menu") {
           const item = (id, icon, title, desc) =>
             '<button class="btn" id="' + id + '" style="display:flex;width:100%;text-align:left;align-items:flex-start;gap:6px;margin-top:6px;padding:8px 10px"><span style="margin-top:2px">' + icon + '</span><span><b style="font-size:12px">' + title + '</b><br><span class="faint" style="font-size:10px;line-height:1.5">' + desc + "</span></span></button>";
-          // 見出しと名前は Design Desk の左ナビ（AIに渡している情報 › Figma › サイトマップ / デザインシステム / コンポーネント）に揃える（2026-09-13 オーナー指摘・2026-09-26 に「デザイン定義」の見出しをやめた）。「AIでつくる」（ワイヤー / モックアップ）は 2026-09-26 から機能ごと止めていて、サーバーが false を返すので出ない
+          // 見出しと名前は Design Desk の左ナビ（AIに共有中 › Figma › サイトマップ / デザインシステム / コンポーネント）に揃える（2026-09-13 オーナー指摘・2026-09-26 に「デザイン定義」の見出しをやめた）。「AIでつくる」（ワイヤー / モックアップ）は 2026-09-26 から機能ごと止めていて、サーバーが false を返すので出ない
           const head = (t) => '<p class="faint" style="margin:10px 0 0;font-size:10px;font-weight:bold;letter-spacing:.02em">' + t + "</p>";
           return '<p style="margin:0;font-weight:bold;font-size:12px">設定</p>' +
-            head("AIに渡している情報") +
+            head("AIに共有中") +
             item("screensbtn", I.grid, "サイトマップ: Frame を Design Desk に送る", "開発に渡す Frame や Section を選んで送ります。Design Desk の「サイトマップ」で画面として整理します（AI は使いません・Figma は変えません）") +
             (d.can_sync_ds ? item("syncds", I.palette, "デザインシステム: Collection の同期", "このファイルのCollection（色・余白などの変数）をDesign Deskへ取り込みます（ディレクター用）") : "") +
             // コンポーネント同期は書き手（デザイナー以上）。Web の「手元のClaudeで同期」の依頼と同じ（2026-09-25）。旧サーバーは can_sync_components を返さないので can_sync_ds で代える

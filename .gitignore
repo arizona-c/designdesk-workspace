@@ -3,6 +3,7 @@ CLAUDE.local.md
 local/
 .claude/settings.local.json
 .claude/designdesk-rules.md
+.claude/designdesk-entry.md
 .mcp.json
 .claude/.synced-version
 .claude/.stale-checked

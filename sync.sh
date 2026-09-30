@@ -6,7 +6,7 @@
 # 手動実行もOK。やること:
 #   1. workspace自体の自動更新（gitで取得したフォルダは git pull／zipで配られたフォルダは Design Desk から雛形を取得して上書き。
 #      Figmaプラグインの新版もこれで手元に届く）
-#   2. Design Desk から最新ルールを取得して .claude/designdesk-rules.md を更新（3ツール共通の正本）
+#   2. Design Desk から最新ルールを取得して .claude/designdesk-rules.md を更新（3ツール共通の正本）。入口の本文 .claude/designdesk-entry.md も同時に
 #   3. チケット操作ツール（MCP）とFigma接続の設定を生成: .mcp.json（Claude）/ .codex/config.toml（Codex）/ .gemini/settings.json（Gemini）
 #   4. 手順（スキル）を .claude/skills から .agents/skills（Codex・Gemini 共通）へ複製
 # 実行中に自分自身が書き換わると誤動作するため、全体を関数にして末尾のブロックでまとめて実行する
@@ -74,6 +74,13 @@ sync_designdesk() {
     mv .claude/designdesk-rules.md.tmp .claude/designdesk-rules.md
     SYNCED_VERSION=$(grep -i '^x-rules-version:' "$hdrs" | tr -dc '0-9')
     echo "${SYNCED_VERSION:-0}" > .claude/.synced-version
+    # 入口の本文（ふるまい・手伝えること）も Design Desk から。CLAUDE.md / AGENTS.md / GEMINI.md は AI ごとの起動と Figma 接続だけを持ち、本文はこのファイルを読む（2026-09-30）
+    if curl -fsS -m 10 -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
+      "$DESIGNDESK_URL/api/sync/entry?project=$DESIGNDESK_PROJECT" -o .claude/designdesk-entry.md.tmp; then
+      mv .claude/designdesk-entry.md.tmp .claude/designdesk-entry.md
+    else
+      rm -f .claude/designdesk-entry.md.tmp
+    fi
     # この同期成功の瞬間、Design Desk側のサイドバーの連携チップも🟢になる（last_used_at更新）
     echo "🔗 Design Desk と連携しました（プロジェクト: ${DESIGNDESK_PROJECT}）— Web側サイドバーの連携表示も点灯します"
     echo "✅ 最新ルールを同期しました（$(head -1 .claude/designdesk-rules.md | sed 's/# //')）"

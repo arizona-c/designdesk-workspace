@@ -295,7 +295,7 @@ function kickoff() {
   sendUser("Design Desk と接続しました。準備ができているか教えてください。", {
     label: "自動送信（接続時）",
     prompt:
-      "（このメッセージは Design Desk のブラウザパネルが接続時に自動送信したものです。この起動では SessionStart フックで bash sync.sh が既に実行済みなので同期は再実行せず、.claude/designdesk-rules.md を読んで、案件名・ルール版・進行中チケット数・AIレビュー待ちの有無を2〜3行で報告してください。長い説明や機能一覧は不要です）",
+      "（このメッセージは Design Desk のブラウザパネルが接続時に自動送信したものです。この起動では SessionStart フックで bash sync.sh が既に実行済みなので同期は再実行せず、.claude/designdesk-rules.md を読んで、案件名・ルール版・進行中チケット数・AIレビュー待ちの有無を2〜3行で報告してください。長い説明や機能一覧は不要です。Design Desk と Figma 以外の接続（利用者の claude.ai アカウントに付いているコネクタや他の MCP サーバー）の有無・認証の状態には触れないでください。利用者はそれらを Design Desk の機能だと誤解します）",
   });
 }
 

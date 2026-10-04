@@ -97,7 +97,8 @@ function checkLogin() {
   if (existsSync(join(homedir(), ".claude", ".credentials.json"))) return { ok: true, how: "~/.claude/.credentials.json" };
   return { ok: false, reason: "not_logged_in" };
 }
-const LOGIN = checkLogin();
+// DESIGNDESK_ASSUME_LOGIN=no で「未ログイン」の流れを試せる（開発用）
+let LOGIN = process.env.DESIGNDESK_ASSUME_LOGIN === "no" ? { ok: false, reason: "not_logged_in" } : checkLogin();
 /** ログインできていないときに、ターミナルで何をすればよいか（パネルにも同じ文を出す） */
 function loginGuide() {
   const where = VIA_SSH ? "この Mac（SSH の先・橋渡しを動かしている方）" : "この Mac";
@@ -439,6 +440,34 @@ const server = createServer(async (req, res) => {
   json(res, 404, { error: "not found" });
 });
 
+/** 未ログインなら、その場で直す（2026-10-04 オーナー: 人にコマンドを打たせない）。ターミナルが対話できるときだけ。
+ *  未ログイン → Enter で claude を起動（/login → /exit で戻る） / キーチェーンがロック → Enter で security unlock-keychain。終わったらもう一度確かめる */
+async function offerLoginFix() {
+  if (LOGIN.ok || !process.stdin.isTTY || process.env.DESIGNDESK_NO_LOGIN_FIX) return;
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const locked = LOGIN.reason === "keychain_locked";
+  console.log("");
+  console.log(`⚠ ${loginGuide()}`);
+  console.log("");
+  const answer = await rl.question(locked
+    ? "  Enter を押すと、ここでキーチェーンを解錠します（Mac のログインパスワードを聞かれます）。あとで自分でやるなら s を押して Enter: "
+    : "  Enter を押すと、ここで claude を起動します。/login でログインし、終わったら /exit で戻ってきてください。あとで自分でやるなら s を押して Enter: ");
+  rl.close();
+  if (answer.trim().toLowerCase() === "s") return;
+  await new Promise((done) => {
+    const p = locked
+      ? spawn("security", ["unlock-keychain", join(homedir(), "Library", "Keychains", "login.keychain-db")], { stdio: "inherit" })
+      : spawn(CLAUDE.bin, [], { cwd: ROOT, stdio: "inherit", env: process.env, shell: process.platform === "win32" });
+    p.on("exit", () => done());
+    p.on("error", () => done());
+  });
+  LOGIN = checkLogin();
+  console.log("");
+  console.log(LOGIN.ok ? `✅ Claude のログインを確認できました（${LOGIN.how}）。橋渡しを続けます` : `⚠ まだ確認できません。${loginGuide()}`);
+}
+
+await offerLoginFix();
 server.listen(PORT, "127.0.0.1", () => {
   console.log("");
   console.log("Design Desk ローカルClaude連携パネル（ベータ）");

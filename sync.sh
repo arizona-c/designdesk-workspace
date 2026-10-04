@@ -68,7 +68,10 @@ sync_designdesk() {
   mkdir -p .claude
   SYNCED_VERSION=$(cat .claude/.synced-version 2>/dev/null | tr -dc '0-9')
   local hdrs=".claude/.sync-headers.tmp"
-  if curl -fsS -m 10 -D "$hdrs" -H "Authorization: Bearer $DESIGNDESK_TOKEN" \
+  # このフォルダの場所を Design Desk に知らせる（base64・ホームの「続きを進める」から VS Code / Cursor / Warp でここを開けるようになる・#114）
+  local ws_dir_b64
+  ws_dir_b64=$(printf %s "$PWD" | base64 | tr -d '\n')
+  if curl -fsS -m 10 -D "$hdrs" -H "Authorization: Bearer $DESIGNDESK_TOKEN" -H "X-DD-Workspace-Dir: $ws_dir_b64" \
     "$DESIGNDESK_URL/api/sync/claude-md?project=$DESIGNDESK_PROJECT" \
     -o .claude/designdesk-rules.md.tmp; then
     mv .claude/designdesk-rules.md.tmp .claude/designdesk-rules.md

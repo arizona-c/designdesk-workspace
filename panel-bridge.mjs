@@ -75,6 +75,38 @@ if (!CLAUDE) {
   console.error("Claude Code が見つかりません。Claude Code CLI をインストールするか、Claudeデスクトップアプリで一度 Code を開いてください");
   process.exit(1);
 }
+const BRIDGE_VERSION = 3; // 3: ログイン状態の確認と日本語の案内（loginHint）・SSH の案内
+
+// ---- Claude のログイン状態（起動時に一度・2026-10-04 #116）----
+// 「Not logged in · Please run /login」はパネルからは直せない（-p の子プロセスでは /login が使えない）ので、起動時に先に確かめて、
+// ターミナルで何をすればよいかを日本語で出す。SSH 越しだと macOS のログインキーチェーンがロックされていて、保存済みの認証を読めないことがある
+const VIA_SSH = !!(process.env.SSH_CONNECTION || process.env.SSH_TTY);
+function checkLogin() {
+  if (process.env.ANTHROPIC_API_KEY) return { ok: true, how: "ANTHROPIC_API_KEY" };
+  if (process.platform === "darwin") {
+    try {
+      execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials"], { stdio: ["ignore", "ignore", "pipe"] });
+      return { ok: true, how: "キーチェーン" };
+    } catch (e) {
+      const msg = String(e?.stderr ?? e?.message ?? "");
+      if (/could not be found/i.test(msg)) return { ok: false, reason: "not_logged_in" };
+      if (/interaction is not allowed|locked|keychain could not be found/i.test(msg)) return { ok: false, reason: "keychain_locked" };
+      return { ok: false, reason: "unknown", detail: msg.slice(0, 120) };
+    }
+  }
+  if (existsSync(join(homedir(), ".claude", ".credentials.json"))) return { ok: true, how: "~/.claude/.credentials.json" };
+  return { ok: false, reason: "not_logged_in" };
+}
+const LOGIN = checkLogin();
+/** ログインできていないときに、ターミナルで何をすればよいか（パネルにも同じ文を出す） */
+function loginGuide() {
+  const where = VIA_SSH ? "この Mac（SSH の先・橋渡しを動かしている方）" : "この Mac";
+  if (LOGIN.reason === "keychain_locked") {
+    return `Claude の認証を読めません（SSH 越しでログインキーチェーンがロックされています）。${where}のターミナルで次を実行してから、橋渡し（node panel-bridge.mjs）を起動し直してください: security unlock-keychain ~/Library/Keychains/login.keychain-db`;
+  }
+  const which = CLAUDE.from.startsWith("デスクトップ") ? "（いま使っている本体はデスクトップアプリ同梱です。CLI 版を入れている場合は PATH を確認してください）" : "";
+  return `Claude にログインしていません。${where}のターミナルで claude を起動して /login でログインし、そのあと橋渡し（node panel-bridge.mjs）を起動し直してください。パネルからはログインできません${which}`;
+}
 
 // ---- 状態 ----
 const pairCode = String(Math.floor(100000 + Math.random() * 900000));
@@ -96,7 +128,7 @@ function emit(ev, keep = true) {
   }
 }
 function state() {
-  return { type: "state", project: PROJECT, cwd: ROOT, busy, sessionId, running: !!child };
+  return { type: "state", project: PROJECT, cwd: ROOT, busy, sessionId, running: !!child, loginHint: LOGIN.ok ? null : loginGuide() };
 }
 
 // ---- claude 子プロセス ----
@@ -137,9 +169,7 @@ function ensureChild() {
     busy = false;
     for (const id of pending.keys()) emit({ type: "permission_resolved", requestId: id, behavior: "deny" });
     pending.clear();
-    const hint = /log ?in|auth|credential|token/i.test(lastErr)
-      ? " Claude にログインしていない可能性があります。ターミナルで claude を起動してログインしてください"
-      : "";
+    const hint = /log ?in|auth|credential|token/i.test(lastErr) ? ` ${loginGuide()}` : "";
     emit({ type: "status", message: code === 0 ? "Claude を終了しました" : `Claude が終了しました（code ${code}）${lastErr ? `: ${lastErr}` : ""}。${hint || "次の送信で再開します"}` });
     emit(state(), false);
   });
@@ -225,6 +255,8 @@ function handleLine(line) {
     case "result": {
       busy = false;
       sessionId = m.session_id || sessionId;
+      // 「Not logged in · Please run /login」は英語のまま出さず、ターミナルで何をすればよいかを出す
+      if (m.is_error && /not logged in|\/login|authentication/i.test(String(m.result ?? ""))) emit({ type: "status", message: loginGuide() });
       emit({ type: "result", ok: !m.is_error, durationMs: m.duration_ms ?? null, costUsd: m.total_cost_usd ?? null });
       emit(state(), false);
       return;
@@ -326,7 +358,7 @@ const server = createServer(async (req, res) => {
     return res.end();
   }
   if (req.method === "GET" && url.pathname === "/status") {
-    return json(res, 200, { ok: true, project: PROJECT, paired: authed(req, url), version: 2 });
+    return json(res, 200, { ok: true, project: PROJECT, paired: authed(req, url), version: BRIDGE_VERSION, loginHint: LOGIN.ok ? null : loginGuide() });
   }
   if (req.method === "POST" && url.pathname === "/pair") {
     const { code } = await readBody(req);
@@ -368,6 +400,12 @@ const server = createServer(async (req, res) => {
     const t = String(text ?? "").trim();
     if (!t) return json(res, 400, { error: "empty" });
     if (busy) return json(res, 409, { error: "Claude が応答中です。完了か中断を待ってください" });
+    // /login はこの子プロセス（claude -p）では使えないので、Claude に渡さずに案内を返す
+    if (/^\/login\b/.test(t)) {
+      emit({ type: "user", text: t, contextLabel: null });
+      emit({ type: "status", message: loginGuide() });
+      return json(res, 202, { ok: true });
+    }
     const ctx =
       context && typeof context === "object" && typeof context.prompt === "string"
         ? { label: String(context.label ?? "").slice(0, 80), prompt: String(context.prompt).slice(0, 1000) }
@@ -406,13 +444,22 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("Design Desk ローカルClaude連携パネル（ベータ）");
   console.log(`  作業フォルダ : ${ROOT}`);
   console.log(`  プロジェクト : ${PROJECT || "(.env 未設定)"}`);
-  console.log(`  Claude本体   : ${CLAUDE.from}`);
+  console.log(`  Claude本体   : ${CLAUDE.from}（${CLAUDE.bin}）`);
+  console.log(`  ログイン     : ${LOGIN.ok ? `確認できました（${LOGIN.how}）` : "⚠ 確認できません"}`);
   console.log(`  待ち受け     : http://127.0.0.1:${PORT}（このPC内のみ）`);
   console.log(`  許可オリジン : ${[...allowedOrigins].join(", ")}`);
   console.log("");
+  if (!LOGIN.ok) {
+    console.log(`  ⚠ ${loginGuide()}`);
+    console.log("");
+  }
+  if (VIA_SSH) {
+    console.log(`  ℹ SSH 越しに動いています。手元の PC のブラウザから使うには、SSH に -L ${PORT}:localhost:${PORT} を足してつなぎ直してください（例: ssh -L ${PORT}:localhost:${PORT} ユーザー名@このMac）`);
+    console.log("");
+  }
   console.log(`  🔑 接続コード: ${pairCode}`);
   console.log("");
-  console.log("Design Desk の右下「Claude」ボタンからパネルを開き、このコードを入力してください。止めるには Ctrl+C。");
+  console.log("Design Desk の右端「Claude」ボタンからパネルを開き、このコードを入力してください。止めるには Ctrl+C。");
 });
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") {

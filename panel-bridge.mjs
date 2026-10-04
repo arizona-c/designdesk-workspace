@@ -492,10 +492,26 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("");
   console.log("Design Desk の右端「Claude」ボタンからパネルを開き、このコードを入力してください。止めるには Ctrl+C。");
 });
-server.on("error", (e) => {
+server.on("error", async (e) => {
   if (e.code === "EADDRINUSE") {
-    console.error(`ポート ${PORT} は使用中です。既に起動していないか確認してください（別ポートは DESIGNDESK_PANEL_PORT=番号 で指定）`);
+    // 前の橋渡しが残っている（別のターミナル・SSH の中など）。対話できるなら、その場で止めて続ける（2026-10-04: ダブルクリックで開き直すときに毎回起きる）
+    let pids = [];
+    try { pids = execFileSync("lsof", ["-ti", `tcp:${PORT}`], { encoding: "utf8" }).split(/\s+/).filter(Boolean); } catch {}
+    if (pids.length && process.stdin.isTTY && !process.env.DESIGNDESK_NO_LOGIN_FIX) {
+      const { createInterface } = await import("node:readline/promises");
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await rl.question(`ポート ${PORT} は前の橋渡し（プロセス ${pids.join(", ")}）が使っています。Enter を押すと前のを止めてこちらを続けます。やめるなら s を押して Enter: `);
+      rl.close();
+      if (answer.trim().toLowerCase() !== "s") {
+        for (const pid of pids) { try { process.kill(Number(pid), "SIGTERM"); } catch {} }
+        await new Promise((r) => setTimeout(r, 800));
+        server.listen(PORT, "127.0.0.1");
+        return;
+      }
+    }
+    console.error(`ポート ${PORT} は使用中です。前の橋渡しのターミナルで Ctrl+C してから、もう一度起動してください（別ポートは DESIGNDESK_PANEL_PORT=番号 で指定）`);
   } else console.error(e);
+  if (process.stdin.isTTY) { const { createInterface } = await import("node:readline/promises"); const rl = createInterface({ input: process.stdin, output: process.stdout }); await rl.question("Enter で閉じます"); rl.close(); }
   process.exit(1);
 });
 process.on("SIGINT", () => {

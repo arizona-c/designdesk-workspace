@@ -85,8 +85,10 @@ function checkLogin() {
   if (process.env.ANTHROPIC_API_KEY) return { ok: true, how: "ANTHROPIC_API_KEY" };
   if (process.platform === "darwin") {
     try {
-      execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials"], { stdio: ["ignore", "ignore", "pipe"] });
-      return { ok: true, how: "キーチェーン" };
+      // SSH 越しは中身（-w）まで読む: ロックされていると項目は見えても中身が読めず、Claude も「Not logged in」になる（2026-10-04 に見逃した）。
+      // 画面のある端末では中身を読まない（別アプリの項目を読むと許可のダイアログが出ることがある）
+      execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", ...(VIA_SSH ? ["-w"] : [])], { stdio: ["ignore", "ignore", "pipe"] });
+      return { ok: true, how: VIA_SSH ? "キーチェーン（中身まで確認）" : "キーチェーン" };
     } catch (e) {
       const msg = String(e?.stderr ?? e?.message ?? "");
       if (/could not be found/i.test(msg)) return { ok: false, reason: "not_logged_in" };

@@ -1,0 +1,4 @@
+{
+  "description": "Design Desk のホームを pane に出す hooks module",
+  "modules": ["./register.js"]
+}

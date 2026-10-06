@@ -1,0 +1,6 @@
+{
+  "name": "designdesk",
+  "version": "0.1.0",
+  "description": "Design Desk のホーム（まずやること・いまのチケット・あなたの順番の一覧）をターミナルの中に出し、一言を送って AI に進めてもらう",
+  "author": { "name": "Arizona Creative Inc." }
+}
